@@ -315,6 +315,39 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 }
 .toast button { background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; font-weight: 600; }
 .toast.err { background: var(--warn); color: #fff; }
+.dock { display: none; }
+@media (max-width: 760px) {
+  /* volgorde op de telefoon: instellingen, dan de gekozen lens, dan het vel */
+  .detail { order: 2; }
+  .stage { order: 3; }
+  .dock:not([hidden]) { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
+    background: var(--mat); color: var(--mat-ink); padding: 6px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.28); }
+  .dockbar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px;
+    font: 600 14px/1.2 var(--font-cond); letter-spacing: 0.02em; }
+  .dockbar .linkbtn { color: var(--mat-ink); font: 500 13px/1.2 var(--font-ui); padding: 4px 0; }
+  .dockscroll { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .dockscroll::-webkit-scrollbar { display: none; }
+  .docklabel { position: relative; cursor: zoom-in; }
+  .docklabel.fit { cursor: zoom-out; }
+  .docklabel svg { position: absolute; left: 0; top: 0; transform-origin: 0 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.35)); }
+  body.hasdock { padding-bottom: var(--dockH, 120px); }
+  /* kop scrolt mee weg, de tabbladen blijven bovenin: meer ruimte om te ontwerpen */
+  .bar { position: static; }
+  .tabs { top: env(safe-area-inset-top, 0px); }
+  .detail { scroll-margin-top: 8px; }
+  body.hasdock .toast { bottom: calc(var(--dockH, 120px) + 10px); }
+  #dKeys { display: none; }
+}
+/* aanraakschermen: grotere knoppen en velden (16 px voorkomt inzoomen op de iPhone) */
+@media (pointer: coarse) {
+  .inp, input[type=number], input[type=text], select { font-size: 16px; }
+  .lens .iconbtn, .zone .iconbtn, .stripe .iconbtn, .saved .iconbtn { min-width: 36px; min-height: 36px; font-size: 18px; }
+  .lens { padding-top: 2px; padding-bottom: 2px; }
+  .swatches { gap: 8px; }
+  .swatch .chip { width: 26px; height: 32px; }
+  .btn.small { padding: 8px 12px; font-size: 14px; }
+}
 
 #printArea { display: none; }
 @media print {
@@ -604,6 +637,11 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 
 <div id="printArea"></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<!-- telefoon: het gekozen label blijft in beeld terwijl je ontwerpt -->
+<div class="dock" id="dock" hidden>
+  <div class="dockbar"><span id="dockName"></span><button type="button" class="linkbtn" id="dockZoom">Heel label</button></div>
+  <div class="dockscroll" id="dockScroll"><div class="docklabel" id="dockLabel"></div></div>
+</div>
 
 <script>
 // Focusringlabels — rekenkern (geen DOM). Alle maten in mm.
@@ -1809,6 +1847,7 @@ var I18N = (function () {
     'op 100%, daarna snijden langs de lijn.': 'at 100%, then cut along the line.',
     'Nog geen .tl-bestanden bij de hand?': 'No .tl files at hand?',
     'Voorbeeld bekijken': 'View an example',
+    'Inzoomen': 'Zoom in',
     'Voorbeeld 50 mm geladen. Dit is een verzonnen lens om de app te bekijken.': 'Example 50 mm loaded. This is a made-up lens to try out the app.',
     'Profiel': 'Profile',
     'Een profiel bevat de ring en het label. Alles op dit tabblad geldt voor elke map met dit profiel.': 'A profile holds the ring and the label. Everything on this tab applies to every folder with this profile.',
@@ -2664,6 +2703,7 @@ function render() {
   if (!sel && f) { var first = lensesOf(f.id)[0]; if (first) sel = first.id; }
   $('subTitle').textContent = ringOf(activeFolder()).label;
   renderFolders(); renderStyle(); renderPages(); renderDetail(); renderRingPane(); syncRingValues(); renderDefaults(); renderBackup();
+  renderDock();
 }
 
 function chipFor(style) {
@@ -3098,6 +3138,59 @@ $('zeroRef').addEventListener('change', function () {
   changed();
 });
 
+// ---------- telefoon: het gekozen label onderin beeld ----------
+var DOCK = { zoom: true, stageSeen: false, typing: false };
+try { DOCK.zoom = localStorage.getItem('focusringlabels.dockFit') !== '1'; } catch (e) {}
+var narrowMQ = window.matchMedia('(max-width: 760px)');
+function dockLens(f) {
+  var ls = lensesOf(f.id).filter(function (l) { return l.include !== false; });
+  return ls.filter(function (l) { return l.id === sel; })[0] || ls[0];
+}
+function renderDock() {
+  var d = $('dock'), f = activeFolder(), l = f && dockLens(f);
+  var show = narrowMQ.matches && !!l && !DOCK.stageSeen && !DOCK.typing;
+  d.hidden = !show;
+  document.body.classList.toggle('hasdock', show);
+  if (!show) return;
+  var strip = null, page = null;
+  pagesFor(f).forEach(function (p) { p.strips.forEach(function (s) { if (s.lensId === l.id) { strip = s; page = p; } }); });
+  if (!strip) { d.hidden = true; document.body.classList.remove('hasdock'); return; }
+  var r = strip.ring, pts = [[-1, r.top - 1], [r.W + 1, r.top - 1], [-1, r.bottom + 1], [r.W + 1, r.bottom + 1], [-1, (r.top + r.bottom) / 2], [r.W + 1, (r.top + r.bottom) / 2]]
+    .map(function (q) { return strip.T(q[0], q[1]); });
+  var x0 = Math.min.apply(null, pts.map(function (q) { return q[0]; })), x1 = Math.max.apply(null, pts.map(function (q) { return q[0]; }));
+  var y0 = Math.min.apply(null, pts.map(function (q) { return q[1]; })), y1 = Math.max.apply(null, pts.map(function (q) { return q[1]; }));
+  var wMM = x1 - x0, lMM = y1 - y0;
+  var avail = $('dockScroll').clientWidth || (window.innerWidth - 24);
+  var k = DOCK.zoom ? 74 / wMM : avail / lMM, wPx = wMM * k, lPx = lMM * k;
+  var svg = Engine.pageSVG(page, { idPrefix: 'dk', size: [wPx.toFixed(1), lPx.toFixed(1)], background: false,
+    viewBox: [x0, y0, wMM, lMM].map(function (x) { return Math.round(x * 1000) / 1000; }) });
+  var box = $('dockLabel');
+  box.style.width = lPx + 'px'; box.style.height = wPx + 'px';
+  box.className = 'docklabel' + (DOCK.zoom ? '' : ' fit');
+  box.innerHTML = svg;
+  var el0 = box.firstChild; el0.style.transform = 'translate(0,' + wPx + 'px) rotate(-90deg)';
+  el0.removeAttribute('data-lens');
+  $('dockName').textContent = f.name + ' · ' + lensName(l).replace(l.brandName + ' ', '');
+  $('dockZoom').textContent = DOCK.zoom ? 'Heel label' : 'Inzoomen';
+  document.documentElement.style.setProperty('--dockH', d.offsetHeight + 'px');
+}
+function toggleDockZoom() {
+  DOCK.zoom = !DOCK.zoom;
+  try { localStorage.setItem('focusringlabels.dockFit', DOCK.zoom ? '0' : '1'); } catch (e) {}
+  renderDock(); $('dockScroll').scrollLeft = 0;
+}
+$('dockZoom').addEventListener('click', toggleDockZoom);
+$('dockLabel').addEventListener('click', toggleDockZoom);
+// zie je het vel zelf al, dan is het label onderin niet nodig
+if (window.IntersectionObserver) new IntersectionObserver(function (es) {
+  es.forEach(function (e) { DOCK.stageSeen = e.isIntersecting && e.intersectionRatio > 0.25; });
+  renderDock();
+}, { threshold: [0, 0.25, 0.5] }).observe(document.querySelector('.pagescroll'));
+// tijdens typen (toetsenbord open) weg, anders staat hij boven het toetsenbord
+document.addEventListener('focusin', function (e) { var t = e.target; if (t.matches && t.matches('input[type=text], input[type=number], input:not([type])')) { DOCK.typing = true; renderDock(); } });
+document.addEventListener('focusout', function () { if (DOCK.typing) { DOCK.typing = false; setTimeout(renderDock, 50); } });
+if (narrowMQ.addEventListener) narrowMQ.addEventListener('change', renderDock);
+
 // ---------- vellen ----------
 // waarschuwing: per-lens-∞ staat aan, maar er is geen referentielens -> alle ∞ op dezelfde plek
 function renderAnchorWarn(f, pg) {
@@ -3168,7 +3261,7 @@ function renderPages() {
 }
 $('pages').addEventListener('click', function (e) {
   var g = e.target.closest && e.target.closest('[data-lens]');
-  if (g) { sel = g.getAttribute('data-lens'); changed(); }
+  if (g) { sel = g.getAttribute('data-lens'); changed(); if (narrowMQ.matches) setTimeout(function () { $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); }
 });
 
 // ---------- detail ----------
@@ -3578,6 +3671,7 @@ function renderBackup() {
   if (fileLinked()) txt = 'Wordt automatisch bewaard in ' + LF.name + '.';
   var warn = !fileLinked() && n > 1 && (d === null || d > 7);
   ['backupLib', 'backupExp'].forEach(function (id) { var e = $(id); if (!e) return; e.textContent = txt; e.className = 'backup' + (warn ? ' warn' : ''); });
+  $('backupLib').hidden = !n && !fileLinked();   // lege bibliotheek: nog niets om te bewaren
   $('backupExp').hidden = fileLinked();
   $('btnSaveLib').className = 'btn small' + (fileLinked() || (typeof LF !== 'undefined' && LF.ok) ? '' : ' primary');
   if (typeof LF !== 'undefined' && LF.ok) $('btnLinkFile').className = 'btn small' + (LF.handle ? '' : ' primary');
@@ -3990,7 +4084,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '34 · ' + (LANG === 'en' ? '2026-10-14 · no sample lens or folder' : '14-10-2026 · geen voorbeeldlens of -map meer');
+var APP_VERSION = '35 · ' + (LANG === 'en' ? '2026-10-14 · label stays in view on your phone' : '14-10-2026 · label in beeld op de telefoon');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
