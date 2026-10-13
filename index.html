@@ -134,6 +134,10 @@ details.more[open] > summary::after { transform: translateY(2px) rotate(-135deg)
 details.more > summary:hover::after { border-color: var(--ink); }
 details.more > .body { display: flex; flex-direction: column; gap: 12px; padding: 0 0 18px; }
 .sumval { font: 500 13px/1 var(--font-ui); color: var(--muted); }
+/* groepskop in het tabblad Ring: Ring en Label duidelijk uit elkaar */
+.pane > h2.grouphead { margin: 14px 0 0; padding: 14px 0 2px; border-top: 2px solid var(--ink);
+  font: 700 13px/1 var(--font-cond); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); }
+.pane > h2.grouphead + * { border-top: 0; }
 .row.between { justify-content: space-between; flex-wrap: nowrap; }
 .inp.auto { width: auto; }
 .panel { border-right: 1px solid var(--line); }
@@ -432,13 +436,6 @@ details[open] summary { margin-bottom: 10px; }
           </div>
         </div>
       </details>
-      <details class="more" id="dCorners">
-        <summary>Afgeronde hoeken <span class="sumval" id="cornerState"></span></summary>
-        <div class="body">
-          <div id="cornerSliders" class="stack"></div>
-          <p class="hint" id="cornerHint"></p>
-        </div>
-      </details>
       <section class="stack">
         <div class="row"><button class="btn small" id="btnStyleSave" type="button">Opmaak bewaren…</button></div>
         <form class="saveform stack" id="saveForm" hidden>
@@ -464,10 +461,25 @@ details[open] summary { margin-bottom: 10px; }
 
     <div class="pane" id="pane-ring" role="tabpanel" aria-labelledby="tab-ring" hidden>
       <section class="stack">
-        <h2>Ring <b id="ringFor"></b></h2>
+        <h2>Profiel <b id="ringFor"></b></h2>
         <label class="field"><span>Ringprofiel</span><select class="inp" id="profSel"></select></label>
         <p class="hint" id="profUsed"></p>
+        <p class="hint">Een profiel bevat de ring en het label. Alles op dit tabblad geldt voor elke map met dit profiel.</p>
       </section>
+      <details class="more" id="dProfile">
+        <summary>Profiel beheren</summary>
+        <div class="body">
+          <label class="field"><span>Naam</span><input class="inp" id="profName" type="text" maxlength="60"></label>
+          <div class="row">
+            <button class="btn small" id="btnProfCopy" type="button">Kopie maken</button>
+            <button class="btn small danger" id="btnProfDel" type="button">Verwijderen</button>
+          </div>
+          <div class="field"><span>Nieuw profiel met de originele maten</span><div class="row" id="profTemplates"></div></div>
+          <p class="hint">Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.</p>
+        </div>
+      </details>
+
+      <h2 class="grouphead">Ring</h2>
       <section class="stack">
         <h2>∞ en schaal</h2>
         <label class="field" id="infModeBox"><span>Plek van ∞</span>
@@ -484,10 +496,9 @@ details[open] summary { margin-bottom: 10px; }
         </div>
         <div id="ringSliders" class="stack"></div>
         <p class="hint" id="anchorInfo" hidden></p>
-        <p class="hint">Geldt voor elke map met dit profiel.</p>
       </section>
-      <details class="more" id="dRingSize">
-        <summary>Maten van de ring</summary>
+      <details class="more" id="dZeroRef">
+        <summary>Meetpunt op de nudge</summary>
         <div class="body">
           <label class="field"><span>Meet de ∞-afstand vanaf</span>
             <select class="inp" id="zeroRef">
@@ -496,19 +507,6 @@ details[open] summary { margin-bottom: 10px; }
               <option value="center">Midden van de nudge</option>
             </select>
           </label>
-          <div id="advSliders" class="stack"></div>
-        </div>
-      </details>
-      <details class="more" id="dProfile">
-        <summary>Profiel beheren</summary>
-        <div class="body">
-          <label class="field"><span>Naam</span><input class="inp" id="profName" type="text" maxlength="60"></label>
-          <div class="row">
-            <button class="btn small" id="btnProfCopy" type="button">Kopie maken</button>
-            <button class="btn small danger" id="btnProfDel" type="button">Verwijderen</button>
-          </div>
-          <div class="field"><span>Nieuw profiel met de originele maten</span><div class="row" id="profTemplates"></div></div>
-          <p class="hint">Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.</p>
         </div>
       </details>
       <section class="stack">
@@ -522,6 +520,23 @@ details[open] summary { margin-bottom: 10px; }
         <p class="hint">Label met de lijmkant boven in de goot, uitsparing over de nok. Print de mal plat en zonder support.</p>
         <div class="row"><a class="btn small" id="jigLink" target="_blank" rel="noopener">Mal downloaden (STL)</a></div>
       </section>
+
+      <h2 class="grouphead">Label</h2>
+      <details class="more" id="dLabelSize">
+        <summary>Maten van het label</summary>
+        <div class="body"><div id="labelSizeSliders" class="stack"></div></div>
+      </details>
+      <details class="more" id="dNotch">
+        <summary>Uitsparing voor de nudge</summary>
+        <div class="body"><div id="notchSliders" class="stack"></div></div>
+      </details>
+      <details class="more" id="dCorners">
+        <summary>Afgeronde hoeken <span class="sumval" id="cornerState"></span></summary>
+        <div class="body">
+          <div id="cornerSliders" class="stack"></div>
+          <p class="hint" id="cornerHint"></p>
+        </div>
+      </details>
     </div>
 
     <div class="pane" id="pane-export" role="tabpanel" aria-labelledby="tab-export" hidden>
@@ -771,9 +786,8 @@ var Engine = (function () {
       var a = clamp(num(t && t.u0, 0), 0, 40), b = clamp(num(t && t.u1, a + 0.4), 0, 40);
       return { u0: Math.min(a, b), u1: Math.max(a, b), c: isHex(t && t.c) ? t.c : '#111111' };
     }).filter(function (t) { return t.u1 - t.u0 >= 0.05; });
-    // afgeronde hoeken van het label (straal in mm), boven = kant van de nudge
-    var cr = s.corners || {};
-    out.corners = { top: clamp(num(cr.top, 0.9), 0, 13), bottom: clamp(num(cr.bottom, 0.9), 0, 13) };
+    // v30 had de hoeken in de opmaak; die gaan bij het laden naar het ringprofiel (zie migr31 in de app)
+    if (s.corners) out.corners = { top: clamp(num(s.corners.top, 0.9), 0, 13), bottom: clamp(num(s.corners.bottom, 0.9), 0, 13) };
     var o = s.outline || {};
     out.outline = { on: !!o.on, width: clamp(num(o.width, 0.4), 0.05, 3), color: isHex(o.color) ? o.color : '#111111',
       pos: ['in', 'center', 'out'].indexOf(o.pos) > -1 ? o.pos : 'in' };
@@ -923,7 +937,7 @@ var Engine = (function () {
     return { preset: r.preset, zeroRef: r.zeroRef, offset: r.offsetInput, length: r.length, width: r.W,
       infMode: r.infMode, anchorFv: r.anchorFv, anchorLabel: r.anchorLabel,
       notchDepth: r.notch.depth, notchWidth: r.notch.h * 2, notchFilletTop: r.notch.ft, notchFilletBottom: r.notch.fb,
-      mmPer1000: r.mmPer1000, radius: r.radius, endZone: r.endZone };
+      mmPer1000: r.mmPer1000, radius: r.radius, endZone: r.endZone, cornerTop: r.cornerTop, cornerBottom: r.cornerBottom };
   }
   function ringFor(rs) {
     rs = rs || {};
@@ -952,6 +966,9 @@ var Engine = (function () {
     if ((v = pick('mmPer1000', 1, 100)) !== null) r.mmPer1000 = v;
     if ((v = pick('length', 150, 320)) !== null) r.length = v;
     if ((v = pick('width', 12, 30)) !== null) r.W = v;
+    // afgeronde hoeken van het label (straal in mm), boven = kant van de nudge; cornerRadii begrenst ze
+    r.cornerTop = (v = pick('cornerTop', 0, 13)) !== null ? v : r.corner;
+    r.cornerBottom = (v = pick('cornerBottom', 0, 13)) !== null ? v : r.corner;
     if ((v = pick('notchDepth', 1, 12)) !== null) r.notch.depth = v;
     if ((v = pick('notchWidth', 1, 8)) !== null) r.notch.h = v / 2;
     if ((v = pick('notchFillet', 0, 4)) !== null) { r.notch.ft = v; r.notch.fb = v; }
@@ -1005,8 +1022,8 @@ var Engine = (function () {
     return pts;
   }
   // werkelijke hoekstralen: nooit breder dan het label, en bovenaan niet tot in de nudge
-  function cornerRadii(ring, style) {
-    var c = style && style.corners, t = c ? c.top : ring.corner, b = c ? c.bottom : ring.corner;
+  function cornerRadii(ring) {
+    var t = ring.cornerTop !== undefined ? ring.cornerTop : ring.corner, b = ring.cornerBottom !== undefined ? ring.cornerBottom : ring.corner;
     var maxT = Math.max(0, Math.min(ring.W / 2, -ring.top - ring.notch.h - ring.notch.ft - 0.2));
     return { top: clamp(t, 0, maxT), bottom: clamp(b, 0, ring.W / 2), maxTop: maxT, maxBottom: ring.W / 2 };
   }
@@ -1223,7 +1240,7 @@ var Engine = (function () {
     var T = makeT(x0, y0, ring.radius);
     var lay = layoutLens(lens, ring);
     var W = ring.W, items = [], ink = style.ink;
-    var radii = cornerRadii(ring, style);
+    var radii = cornerRadii(ring);
     var outline = mapContour(polyCmds(outlineLocal(ring, radii)), T);
     var zg = zoneGeom(style, ring);
     zg.zones.forEach(function (z) { if (!z.skip) items.push(zoneItem(z, style.zones[z.key], ring, T)); });
@@ -1455,7 +1472,7 @@ var Engine = (function () {
     var n = opts.count || 3;
     for (var k = 0; k < n; k++) {
       var x0 = PAGE.firstX + k * PAGE.pitch, y0 = PAGE.stripTop - ring.top;
-      var T = makeT(x0, y0, ring.radius), clip = mapContour(polyCmds(outlineLocal(ring)), T);
+      var T = makeT(x0, y0, ring.radius), clip = mapContour(polyCmds(outlineLocal(ring, cornerRadii(ring))), T);
       var items = [
         { fill: '#ffffff', contours: [mapContour(polyCmds(rectLocal(-1, W + 1, ring.top - 1, ring.bottom + 1)), T)] },
         { fill: '#0bb4ae', contours: [mapContour(polyCmds(rectLocal(-1, 1.2, ring.top - 1, ring.bottom + 1)), T)] }
@@ -1769,6 +1786,17 @@ var I18N = (function () {
     'aan': 'on',
     'Lijn om het hele label': 'Line around the whole label',
     'Afgeronde hoeken': 'Rounded corners',
+    'Profiel': 'Profile',
+    'Een profiel bevat de ring en het label. Alles op dit tabblad geldt voor elke map met dit profiel.': 'A profile holds the ring and the label. Everything on this tab applies to every folder with this profile.',
+    'Label': 'Label',
+    'Meetpunt op de nudge': 'Measuring point on the nudge',
+    'Maten van het label': 'Label dimensions',
+    'Uitsparing voor de nudge': 'Cutout for the nudge',
+    'Lengte': 'Length',
+    'Breedte': 'Width',
+    'Diepte': 'Depth',
+    'Afronding bovenkant': 'Top rounding',
+    'Afronding onderkant': 'Bottom rounding',
     'Bovenkant': 'Top',
     'Onderkant': 'Bottom',
     'straal, 0 = rechte hoek': 'radius, 0 = square corner',
@@ -2284,6 +2312,20 @@ function migr17(j) {
   });
   j.migr = 17;
 }
+// v31: afgeronde hoeken horen bij het profiel (ring en label), niet meer bij de opmaak van een map
+function migr31(j) {
+  if (j.migr >= 31) return;
+  (j.folders || []).forEach(function (f) {
+    var c = f.style && f.style.corners, prof = (j.profiles || []).filter(function (x) { return x.id === f.profileId; })[0];
+    var r = prof && Engine.ringFor(prof.ring || {});
+    // eerste map met eigen hoeken bepaalt het profiel (zolang dat nog op de standaard staat)
+    if (c && r && (c.top !== 0.9 || c.bottom !== 0.9) && r.cornerTop === r.corner && r.cornerBottom === r.corner) { prof.ring.cornerTop = c.top; prof.ring.cornerBottom = c.bottom; }
+    if (f.style) delete f.style.corners;
+  });
+  (j.saved || []).forEach(function (x) { if (x.style) delete x.style.corners; });
+  if (j.defaults && j.defaults.style) delete j.defaults.style.corners;
+  j.migr = 31;
+}
 // v28: de ∞-meting van de Tilta ARRI-ring hoort bij de Dulens 21 mm (∞ = 9985). Profielen waar de standaard 7,2 mm
 // aan een andere lens hing (bijvoorbeeld de voorbeeldlens van 85 mm), gaan terug naar die meting. Een eigen meting blijft staan.
 function migr28(j) {
@@ -2345,7 +2387,7 @@ function renderDefaults() {
   $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Maak standaard';
 }
 function defaults() {
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 28, profiles: [], saved: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 31, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   var lens = Engine.parseLensFile(JSON.stringify(SAMPLE_TL), 'DULENS PL 85.tl');
   fileLens(lens);
@@ -2379,7 +2421,7 @@ function migrate(j) {
     j.defaults = j.defaults && typeof j.defaults === 'object' ? j.defaults : {};
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
-    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); P = save3;
+    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); P = save3;
     j.saved = (Array.isArray(j.saved) ? j.saved : []).filter(function (x) { return x && x.style; })
       .map(function (x) { return { id: x.id || uid('s'), name: String(x.name || 'Opmaak').slice(0, 40), style: Engine.normalizeStyle(x.style) }; });
     return j;
@@ -2398,7 +2440,7 @@ function migrate(j) {
   });
   if (!P.folders.length) { var nf = newFolder(old.name || 'Lenzen'); nf.style = clone(style); P.folders.push(nf); }
   P.active = P.folders[0].id;
-  toV3(P); migr16(P); migr17(P); migr28(P);
+  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P);
   var out = P; P = save2;
   return out;
 }
@@ -2693,10 +2735,9 @@ function renderStyle() {
     g[1].forEach(function (it) {
       var k = it[0], st = it[2];
       sw.appendChild(swatch(it[1], st, f.styleKey === k, function () {
-        var keep = clone(f.style.outline), keepC = clone(f.style.corners);
+        var keep = clone(f.style.outline);
         f.style = Engine.normalizeStyle(clone(st));
-        // omlijning en hoeken zijn vorm, geen kleur: die blijven staan bij een ander startpunt
-        if (k !== 'mijn' && k.indexOf('u:') !== 0) { f.style.outline = keep; f.style.corners = keepC; }
+        if (k !== 'mijn' && k.indexOf('u:') !== 0) f.style.outline = keep;
         f.styleKey = k; f.styleBase = k.indexOf('u:') === 0 ? k.slice(2) : null; changed();
       }, k === 'mijn' || k.indexOf('u:') === 0));
     });
@@ -2738,7 +2779,6 @@ function renderStyle() {
     $('olSliders').appendChild(olSlider);
   }
   olSlider._show();
-  renderCorners(f);
   $('olOn').checked = ol.on; $('olOpts').hidden = !ol.on;
   if ($('olColor').value !== ol.color) $('olColor').value = ol.color;
   $('olPos').value = ol.pos;
@@ -2746,20 +2786,10 @@ function renderStyle() {
     center: 'De lijn ligt half op het label. Snij precies door het midden van de lijn.',
     out: 'De lijn ligt buiten het label. Snij langs de binnenkant van de lijn, dan zie je hem niet meer op het label.' }[ol.pos];
 }
-// afgeronde hoeken van het label, boven (kant van de nudge) en onder
-var cornerSliders = [];
-function renderCorners(f) {
-  if (!$('cornerSliders')._built) {
-    $('cornerSliders')._built = true;
-    cornerSliders = [['top', 'Bovenkant'], ['bottom', 'Onderkant']].map(function (c) {
-      return sliderField({ id: 'corner_' + c[0], label: c[1], hint: 'straal, 0 = rechte hoek', min: 0, max: 10, step: 0.05, unit: 'mm',
-        get: function () { return activeFolder().style.corners[c[0]]; }, set: function (v) { activeFolder().style.corners[c[0]] = Math.max(0, v); } });
-    });
-    cornerSliders.forEach(function (s) { $('cornerSliders').appendChild(s); });
-  }
-  cornerSliders.forEach(function (s) { s._show(); });
-  var c = f.style.corners, eff = Engine.cornerRadii(ringOf(f), f.style);
-  $('cornerState').textContent = c.top === 0.9 && c.bottom === 0.9 ? '' : dec(r2(eff.top)) + ' / ' + dec(r2(eff.bottom)) + ' mm';
+// afgeronde hoeken van het label, boven (kant van de nudge) en onder; hoort bij het profiel
+function renderCornerInfo() {
+  var r = curRing(), eff = Engine.cornerRadii(r), c = { top: r.cornerTop, bottom: r.cornerBottom };
+  $('cornerState').textContent = c.top === r.corner && c.bottom === r.corner ? '' : dec(r2(eff.top)) + ' / ' + dec(r2(eff.bottom)) + ' mm';
   var hint = 'Bij grote hoeken schuiven de tekst bovenaan en de lensnaam vanzelf iets naar binnen.';
   if (c.top > eff.maxTop + 1e-6) hint = 'Bovenaan wordt het ' + dec(r2(eff.maxTop)) + ' mm: meer past niet boven de nudge. ' + hint;
   if (c.bottom > eff.maxBottom + 1e-6) hint = 'Onderaan wordt het ' + dec(r2(eff.maxBottom)) + ' mm, een halve cirkel. ' + hint;
@@ -2922,7 +2952,7 @@ function renderZones(f) {
 var ringSliders = [];
 function curRing() { return ringOf(activeFolder()); }
 function curRs() { return currentProfile().ring; }
-function ringVal(k) { var r = curRing(); return { offset: r.offsetInput, notchDepth: r.notch.depth, notchWidth: r.notch.h * 2, notchFilletTop: r.notch.ft, notchFilletBottom: r.notch.fb, length: r.length, width: r.W, mmPer1000: r.mmPer1000, radius: r.radius, endZone: r.endZone }[k]; }
+function ringVal(k) { var r = curRing(); return { offset: r.offsetInput, notchDepth: r.notch.depth, notchWidth: r.notch.h * 2, notchFilletTop: r.notch.ft, notchFilletBottom: r.notch.fb, length: r.length, width: r.W, mmPer1000: r.mmPer1000, radius: r.radius, endZone: r.endZone, cornerTop: r.cornerTop, cornerBottom: r.cornerBottom }[k]; }
 function buildRingSliders() {
   function s(id, label, hint, min, max, step) {
     return sliderField({ id: id, label: label, hint: hint, min: min, max: max, step: step, unit: 'mm', get: function () { return ringVal(id); }, set: function (v) { curRs()[id] = v; } });
@@ -2932,21 +2962,27 @@ function buildRingSliders() {
     sliderField({ id: 'mmPer1000', label: 'Schaal', hint: 'mm per 1000 lens-eenheden', min: 15, max: 35, step: 0.01, unit: 'mm', get: function () { return ringVal('mmPer1000'); }, set: function (v) { curRs().mmPer1000 = v; } })
   ];
   main.forEach(function (x) { $('ringSliders').appendChild(x); });
-  ringSliders = [
-    s('notchDepth', 'Nudge: diepte', 'vanaf linkerrand', 2, 10, 0.05),
-    s('notchWidth', 'Nudge: breedte', 'langs de strook', 1.5, 7, 0.05),
-    s('notchFilletTop', 'Nudge: afronding bovenkant', '0 = rechte hoek', 0, 4, 0.05),
-    s('notchFilletBottom', 'Nudge: afronding onderkant', '0 = rechte hoek', 0, 4, 0.05),
-    s('length', 'Lengte strook', 'korter = minder overlap', 200, 270, 0.1),
-    s('width', 'Breedte strook', 'hoogte van de ring', 14, 26, 0.05)
-  ];
-  ringSliders.forEach(function (x) { $('advSliders').appendChild(x); });
-  var adv = [
+  // label: maten, uitsparing voor de nudge en afgeronde hoeken
+  var size = [
+    s('length', 'Lengte', 'korter = minder overlap', 200, 270, 0.1),
+    s('width', 'Breedte', 'hoogte van de ring', 14, 26, 0.05),
     sliderField({ id: 'radius', label: 'Kromming', hint: 'straal, 0 = recht', min: 0, max: 20000, step: 10, unit: 'mm', get: function () { return ringVal('radius'); }, set: function (v) { curRs().radius = v; } }),
     sliderField({ id: 'endZone', label: 'Lege zone onderaan', hint: '', min: 0, max: 40, step: 0.5, unit: 'mm', get: function () { return ringVal('endZone'); }, set: function (v) { curRs().endZone = v; } })
   ];
-  adv.forEach(function (x) { $('advSliders').appendChild(x); });
-  ringSliders = main.concat(ringSliders, adv);
+  size.forEach(function (x) { $('labelSizeSliders').appendChild(x); });
+  var notch = [
+    s('notchDepth', 'Diepte', 'vanaf linkerrand', 2, 10, 0.05),
+    s('notchWidth', 'Breedte', 'langs de strook', 1.5, 7, 0.05),
+    s('notchFilletTop', 'Afronding bovenkant', '0 = rechte hoek', 0, 4, 0.05),
+    s('notchFilletBottom', 'Afronding onderkant', '0 = rechte hoek', 0, 4, 0.05)
+  ];
+  notch.forEach(function (x) { $('notchSliders').appendChild(x); });
+  var corners = [
+    s('cornerTop', 'Bovenkant', 'straal, 0 = rechte hoek', 0, 10, 0.05),
+    s('cornerBottom', 'Onderkant', 'straal, 0 = rechte hoek', 0, 10, 0.05)
+  ];
+  corners.forEach(function (x) { $('cornerSliders').appendChild(x); });
+  ringSliders = main.concat(size, notch, corners);
 }
 var REF_HINT = { center: 'vanaf midden nudge', top: 'vanaf bovenrand nudge', bottom: 'vanaf onderrand nudge' };
 function infFvOf(l) { for (var i = 0; i < l.focus.length; i++) if (Engine.distOf(l.focus[i]) === Infinity) return Number(l.fv[i]); return null; }
@@ -2991,6 +3027,7 @@ function syncRingValues() {
   var r = curRing(), em = ringSliders[0] && ringSliders[0].querySelector('em');
   if (em) em.textContent = (!r.lockInf && r.infMode === 'lens' && r.anchorFv !== null ? '∞ ' + (r.anchorLabel || 'referentie') + ', ' : '') + REF_HINT[r.zeroRef];
   renderAnchor();
+  renderCornerInfo();
   if ($('zeroRef').value !== r.zeroRef) $('zeroRef').value = r.zeroRef;
 }
 $('zeroRef').addEventListener('change', function () {
@@ -3869,7 +3906,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '30 · ' + (LANG === 'en' ? '2026-10-13 · adjustable label corners' : '13-10-2026 · afgeronde hoeken instelbaar');
+var APP_VERSION = '31 · ' + (LANG === 'en' ? '2026-10-13 · ring and label separate' : '13-10-2026 · ring en label apart');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
