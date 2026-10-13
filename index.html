@@ -463,7 +463,7 @@ details[open] summary { margin-bottom: 10px; }
       </section>
       <section class="stack">
         <h2>∞ en schaal</h2>
-        <label class="field"><span>Plek van ∞</span>
+        <label class="field" id="infModeBox"><span>Plek van ∞</span>
           <select class="inp" id="infMode">
             <option value="lens">Per lens, volgens het lensbestand</option>
             <option value="same">Op dezelfde plek voor elke lens</option>
@@ -476,6 +476,7 @@ details[open] summary { margin-bottom: 10px; }
           <p class="hint" id="anchorHint"></p>
         </div>
         <div id="ringSliders" class="stack"></div>
+        <p class="hint" id="anchorInfo" hidden></p>
         <p class="hint">Geldt voor elke map met dit profiel.</p>
       </section>
       <details class="more" id="dRingSize">
@@ -598,11 +599,15 @@ var Engine = (function () {
     // Tilta ARRI-ring: ARRI-maat ring op de Tilta ARRI-adapter van de Nucleus-M II (niet de originele Nucleus-ring).
     // Volgens Stefan: 252 mm sluit het mooist, recht; nudge 4 mm diep en 3,3 mm breed, ingang zonder afronding;
     // beste resultaat op Dulens 21 mm: schaal 24,5 en ∞ 7,2 mm vanaf het midden van de nudge.
+    // Die meting legt één punt van de ring vast: motorwaarde 9985 (∞ van de Dulens 21) ligt 7,2 mm onder de nudge.
+    // Elke andere lens, van elk merk, volgt daaruit met zijn eigen .tl-waarden (gecontroleerd op Dulens, ARRI en Thypoch).
+    // Daarom staat ∞ hier altijd per lens (lockInf) en hoort de meting vast bij dit profiel.
     'tilta-nucleus': {
       label: 'Tilta ARRI-ring op Nucleus-M II (via ARRI-adapter)',
       W: 19.39, top: -9.48, length: 252, corner: 0.9,
       notch: { h: 1.65, depth: 4.0, fillet: 0 },
-      mmPer1000: 24.5, offset: 7.2, radius: 0, endZone: 10, zeroRef: 'center', infMode: 'lens'
+      mmPer1000: 24.5, offset: 7.2, radius: 0, endZone: 10, zeroRef: 'center', infMode: 'lens',
+      anchorFv: 9985, anchorLabel: 'Dulens 21 mm', lockInf: true
     }
   };
 
@@ -923,6 +928,9 @@ var Engine = (function () {
     r.infMode = rs.infMode === 'lens' || rs.infMode === 'same' ? rs.infMode : (base.infMode || 'same');
     r.anchorFv = (rs.anchorFv !== null && rs.anchorFv !== undefined && rs.anchorFv !== '' && isFinite(Number(rs.anchorFv))) ? Number(rs.anchorFv) : null;
     r.anchorLabel = rs.anchorLabel ? String(rs.anchorLabel) : '';
+    if (base.lockInf) r.infMode = 'lens';
+    r.lockInf = !!base.lockInf;
+    if (r.anchorFv === null && base.anchorFv !== undefined) { r.anchorFv = base.anchorFv; r.anchorLabel = base.anchorLabel || ''; }
     function pick(k, lo, hi) {
       if (rs[k] === undefined || rs[k] === null || rs[k] === '') return null;
       var v = Number(rs[k]); return isFinite(v) ? clamp(v, lo, hi) : null;
@@ -1309,7 +1317,7 @@ var Engine = (function () {
       shapes.push(textContours(hdr, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 12 - fy]; }));
       // tweede regel: hoe ∞ en de schaal zijn berekend, zodat je op elk geprint vel ziet welke instelling is gebruikt
       var infTxt = ring.infMode === 'lens'
-        ? (ring.anchorFv !== null ? say('∞ PER LENS, REFERENTIE ', '∞ PER LENS, REFERENCE ') + (ring.anchorLabel || 'INF ' + ring.anchorFv) : say('∞ OP DEZELFDE PLEK  (GEEN REFERENTIELENS GEKOZEN)', '∞ AT THE SAME SPOT  (NO REFERENCE LENS CHOSEN)'))
+        ? (ring.anchorFv !== null ? say('∞ PER LENS, GEMETEN OP ', '∞ PER LENS, MEASURED ON ') + (ring.anchorLabel || 'INF ' + ring.anchorFv) : say('∞ OP DEZELFDE PLEK  (GEEN REFERENTIELENS GEKOZEN)', '∞ AT THE SAME SPOT  (NO REFERENCE LENS CHOSEN)'))
         : say('∞ OP DEZELFDE PLEK VOOR ELKE LENS', '∞ AT THE SAME SPOT FOR EVERY LENS');
       var hdr2 = (infTxt + say('   ·   SCHAAL ', '   ·   SCALE ') + fmt(ring.mmPer1000, 2) + ' MM PER 1000').toUpperCase();
       shapes.push(textContours(hdr2, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 15.2 - fy]; }));
@@ -2058,7 +2066,10 @@ var I18N = (function () {
     [/^Openen lukte niet: (.*)$/, 'Opening failed: $1'],
     [/^Je bibliotheek wordt bewaard in (.+)\. Geef Chrome even toestemming\.$/, 'Your library is saved to $1. Please give Chrome permission.'],
     [/^Je laatste back-up is (\d+) dagen oud\.$/, 'Your last backup is $1 days old.'],
-    [/^Versie (.+)$/, 'Version $1']
+    [/^Versie (.+)$/, 'Version $1'],
+    [/^Gemeten op de (.+)\. Elke andere lens volgt uit zijn eigen lensbestand\. Opnieuw meten: kies een lens en open Schaal nameten\.$/,
+      'Measured on the {1}. Every other lens follows from its own lens file. To re-measure: choose a lens and open Re-measure the scale.'],
+    [/^lens met ∞ = (\d+)$/, 'lens with ∞ = $1']
   ];
 
   var has = Object.prototype.hasOwnProperty;
@@ -2235,6 +2246,20 @@ function migr17(j) {
   });
   j.migr = 17;
 }
+// v28: de ∞-meting van de Tilta ARRI-ring hoort bij de Dulens 21 mm (∞ = 9985). Profielen waar de standaard 7,2 mm
+// aan een andere lens hing (bijvoorbeeld de voorbeeldlens van 85 mm), gaan terug naar die meting. Een eigen meting blijft staan.
+function migr28(j) {
+  if (j.migr >= 28) return;
+  var base = Engine.ringFor({ preset: 'tilta-nucleus' });
+  (j.profiles || []).forEach(function (x) {
+    var rs = x.ring || {};
+    if (Engine.presetKey(rs.preset) !== 'tilta-nucleus') return;
+    var r = Engine.ringFor(rs);
+    if (Math.abs(r.offset - base.offset) < 0.002 && r.anchorFv !== base.anchorFv) { rs.anchorFv = base.anchorFv; rs.anchorLabel = base.anchorLabel; }
+    rs.infMode = 'lens';
+  });
+  j.migr = 28;
+}
 // v16: Tilta-profielen heten nu 'Tilta ARRI-ring' en krijgen de gemeten nudge (4 × 3,3 mm) als die nog op de oude maat stond
 function migr16(j) {
   if (j.migr >= 16) return;
@@ -2282,7 +2307,7 @@ function renderDefaults() {
   $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Maak standaard';
 }
 function defaults() {
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 17, profiles: [], saved: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 28, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   var lens = Engine.parseLensFile(JSON.stringify(SAMPLE_TL), 'DULENS PL 85.tl');
   fileLens(lens);
@@ -2316,7 +2341,7 @@ function migrate(j) {
     j.defaults = j.defaults && typeof j.defaults === 'object' ? j.defaults : {};
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
-    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); P = save3;
+    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); P = save3;
     j.saved = (Array.isArray(j.saved) ? j.saved : []).filter(function (x) { return x && x.style; })
       .map(function (x) { return { id: x.id || uid('s'), name: String(x.name || 'Opmaak').slice(0, 40), style: Engine.normalizeStyle(x.style) }; });
     return j;
@@ -2335,7 +2360,7 @@ function migrate(j) {
   });
   if (!P.folders.length) { var nf = newFolder(old.name || 'Lenzen'); nf.style = clone(style); P.folders.push(nf); }
   P.active = P.folders[0].id;
-  toV3(P); migr16(P); migr17(P);
+  toV3(P); migr16(P); migr17(P); migr28(P);
   var out = P; P = save2;
   return out;
 }
@@ -2870,8 +2895,12 @@ function lensName(l) { return [l.brandName, l.focal ? l.focal + ' mm' : ''].filt
 function renderAnchor() {
   var r = curRing(), rs = curRs(), lensMode = r.infMode === 'lens';
   $('infMode').value = r.infMode;
-  $('anchorBox').hidden = !lensMode;
-  if (!lensMode) return;
+  // Tilta ARRI-ring: ∞ altijd per lens, met de vaste meting van het profiel; niets te kiezen
+  $('infModeBox').hidden = r.lockInf;
+  $('anchorInfo').hidden = !r.lockInf;
+  if (r.lockInf) $('anchorInfo').textContent = 'Gemeten op de ' + (r.anchorLabel || 'lens met ∞ = ' + r.anchorFv) + '. Elke andere lens volgt uit zijn eigen lensbestand. Opnieuw meten: kies een lens en open Schaal nameten.';
+  $('anchorBox').hidden = r.lockInf || !lensMode;
+  if (r.lockInf || !lensMode) return;
   var s = $('anchorSel'); s.textContent = '';
   var none = el('option', '', '— kies de lens waarmee je hebt gemeten —'); none.value = ''; s.appendChild(none);
   var found = false;
@@ -2901,7 +2930,7 @@ $('anchorSel').addEventListener('change', function () {
 function syncRingValues() {
   ringSliders.forEach(function (s) { s._show(); });
   var r = curRing(), em = ringSliders[0] && ringSliders[0].querySelector('em');
-  if (em) em.textContent = (r.infMode === 'lens' && r.anchorFv !== null ? '∞ ' + (r.anchorLabel || 'referentie') + ', ' : '') + REF_HINT[r.zeroRef];
+  if (em) em.textContent = (!r.lockInf && r.infMode === 'lens' && r.anchorFv !== null ? '∞ ' + (r.anchorLabel || 'referentie') + ', ' : '') + REF_HINT[r.zeroRef];
   renderAnchor();
   if ($('zeroRef').value !== r.zeroRef) $('zeroRef').value = r.zeroRef;
 }
@@ -3067,7 +3096,7 @@ function calSection(l, ring, lay) {
     if (!result) return;
     var prof = profileOf(folderById(l.folderId)), prev = clone(prof.ring);
     prof.ring.offset = result.offset; prof.ring.mmPer1000 = result.mmPer1000;
-    if (prof.ring.infMode === 'lens') { prof.ring.anchorFv = infFv; prof.ring.anchorLabel = lensName(l); }
+    if (Engine.ringFor(prof.ring).infMode === 'lens') { prof.ring.anchorFv = infFv; prof.ring.anchorLabel = lensName(l); }
     changed();
     toast('Toegepast op profiel ' + prof.name, { action: { label: 'Ongedaan maken', run: function () { prof.ring = prev; changed(); } }, ms: 7000 });
   };
@@ -3781,7 +3810,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '28 · ' + (LANG === 'en' ? '2026-10-13 · Dutch and English' : '13-10-2026 · Nederlands en Engels');
+var APP_VERSION = '29 · ' + (LANG === 'en' ? '2026-10-13 · ∞ fixed for the Tilta ARRI ring' : '13-10-2026 · ∞ vast voor de Tilta ARRI-ring');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
