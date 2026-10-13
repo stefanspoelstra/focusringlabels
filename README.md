@@ -4,6 +4,10 @@ Web-app om focusringlabels te maken uit Tilta-lensbestanden (`.tl`), voor de Til
 
 **Openen:** https://stefanspoelstra.github.io/focusringlabels/
 
+**Taal:** Nederlands of Engels. Kies met het wereldbolletje rechtsboven in de app.
+
+> **English:** a web app that makes focus ring labels from Tilta lens files (`.tl`), for the Tilta ARRI ring on the Nucleus-M II and the ARRI WCU-4. Open the link above; it starts in English unless your browser is set to Dutch. Switch language with the globe at the top right.
+
 ## Installeren op de Mac (Chrome)
 
 1. Open de link hierboven in Chrome.

@@ -95,6 +95,15 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .iconbtn { border: 0; background: none; cursor: pointer; padding: 4px 6px; border-radius: 4px; color: var(--muted); font-size: 16px; line-height: 1; }
 .iconbtn:hover { background: var(--hover); color: var(--ink); }
 .undo { display: flex; gap: 2px; margin-right: 2px; }
+.lang { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 0 2px 0 6px; border-radius: var(--r); color: var(--muted); cursor: pointer; }
+.lang:hover, .lang:focus-within { background: var(--hover); color: var(--ink); }
+.lang select { appearance: none; -webkit-appearance: none; border: 0; background: none; color: inherit; font: 600 13px/1 var(--font-ui); letter-spacing: 0.04em;
+  padding: 8px 16px 8px 0; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 6px top 50%, right 2px top 50%; background-size: 4px 4px; background-repeat: no-repeat; }
+.lang select:focus { outline: none; }
+.lang:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.lang option { color: initial; background: initial; }
 .undo .iconbtn { padding: 6px; display: inline-flex; }
 .undo .iconbtn:disabled { opacity: 0.3; cursor: default; background: none; }
 .linkbtn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
@@ -332,6 +341,10 @@ details[open] summary { margin-bottom: 10px; }
     </div>
   </div>
   <div class="actions">
+    <label class="lang" title="Taal / Language">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19"/><path d="M12 2.5c2.6 2.7 3.9 5.9 3.9 9.5s-1.3 6.8-3.9 9.5c-2.6-2.7-3.9-5.9-3.9-9.5S9.4 5.2 12 2.5z"/></svg>
+      <select id="langSel" aria-label="Taal / Language"><option value="nl">NL</option><option value="en">EN</option></select>
+    </label>
     <div class="undo" role="group" aria-label="Geschiedenis">
       <button class="iconbtn" id="btnUndo" type="button" aria-label="Ongedaan maken" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
       <button class="iconbtn" id="btnRedo" type="button" aria-label="Opnieuw" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg></button>
@@ -562,6 +575,11 @@ details[open] summary { margin-bottom: 10px; }
 // Lokale strookcoördinaten: u = dwars (0 = linkerrand), v = langs (0 = midden nudge, + naar beneden).
 var Engine = (function () {
   'use strict';
+  // taal van de teksten op het vel ('nl' of 'en'); de app zet dit bij het starten
+  var LANG = 'nl';
+  function setLang(l) { LANG = l === 'en' ? 'en' : 'nl'; }
+  function say(nl, en) { return LANG === 'en' ? en : nl; }
+  var RING_EN = { 'arri-wcu4': 'ARRI WCU-4 ring', 'tilta-nucleus': 'Tilta ARRI ring on Nucleus-M II (via ARRI adapter)' };
 
   // ARRI-ring op de ARRI WCU-4 (standaardmaat, gemeten aan een bestaand labelvel op 300 dpi).
   var RINGS = {
@@ -767,7 +785,7 @@ var Engine = (function () {
   function prettyBrand(raw, filename) {
     var s = String(raw || '').trim();
     if (!s && filename) s = String(filename).replace(/\.[^.]+$/, '').split(/[\s_\-]+/)[0] || '';
-    if (!s) return 'Zonder merk';
+    if (!s) return say('Zonder merk', 'No brand');
     var key = s.toUpperCase().replace(/[\s._\-]+/g, '');
     if (BRANDS[key]) return BRANDS[key];
     return s.split(/\s+/).map(function (w) {
@@ -833,11 +851,11 @@ var Engine = (function () {
   function parseLensFile(text, filename) {
     var j;
     try { j = JSON.parse(String(text).replace(/^﻿/, '')); }
-    catch (e) { throw new Error((filename || 'Bestand') + ' is geen leesbaar lensbestand (geen geldige JSON).'); }
+    catch (e) { throw new Error((filename || say('Bestand', 'File')) + say(' is geen leesbaar lensbestand (geen geldige JSON).', ' is not a readable lens file (not valid JSON).')); }
     if (!j || !Array.isArray(j.focus) || !Array.isArray(j.fv))
-      throw new Error((filename || 'Bestand') + ' mist de lijsten "focus" en "fv". Is dit een Tilta .tl-bestand?');
+      throw new Error((filename || say('Bestand', 'File')) + say(' mist de lijsten "focus" en "fv". Is dit een Tilta .tl-bestand?', ' is missing the "focus" and "fv" lists. Is this a Tilta .tl file?'));
     if (j.focus.length !== j.fv.length)
-      throw new Error((filename || 'Bestand') + ': "focus" en "fv" zijn niet even lang (' + j.focus.length + ' tegen ' + j.fv.length + ').');
+      throw new Error((filename || say('Bestand', 'File')) + say(': "focus" en "fv" zijn niet even lang (', ': "focus" and "fv" differ in length (') + j.focus.length + say(' tegen ', ' vs ') + j.fv.length + ').');
     var brand = String(j.brand || '').trim(), series = String(j.series || '').trim(), focal = String(j.focal_length || '').trim();
     if (!focal && filename) { var m = String(filename).match(/(\d+(?:[.,]\d+)?)\s*mm|\b(\d{2,3})\b/i); if (m) focal = (m[1] || m[2]).replace(',', '.'); }
     var pb = prettyBrand(brand, filename);
@@ -896,7 +914,7 @@ var Engine = (function () {
     rs = rs || {};
     var key = presetKey(rs.preset), base = RINGS[key];
     var bf = base.notch.fillet;
-    var r = { label: base.label, W: base.W, top: base.top, length: base.length, corner: base.corner,
+    var r = { label: LANG === 'en' ? (RING_EN[key] || base.label) : base.label, W: base.W, top: base.top, length: base.length, corner: base.corner,
       notch: { h: base.notch.h, depth: base.notch.depth, ft: base.notch.ft !== undefined ? base.notch.ft : bf, fb: base.notch.fb !== undefined ? base.notch.fb : bf },
       mmPer1000: base.mmPer1000, offset: base.offset, radius: base.radius, endZone: base.endZone, zeroRef: base.zeroRef || 'center', preset: key };
     if (rs.name) r.label = String(rs.name);
@@ -1275,7 +1293,7 @@ var Engine = (function () {
 
   // ---------- pagina's ----------
   // job = { ring: ringinstellingen, style, name, lenses, minors, lensText }
-  function fmt(n, d) { return n.toFixed(d).replace('.', ','); }
+  function fmt(n, d) { return LANG === 'en' ? n.toFixed(d) : n.toFixed(d).replace('.', ','); }
   function buildPages(job, opts) {
     opts = opts || {};
     var ring = ringFor(job.ring);
@@ -1286,14 +1304,14 @@ var Engine = (function () {
     for (var p = 0; p < n; p++) {
       var page = { items: [], strips: [] };
       var ink = '#222222', shapes = [];
-      var hdr = [job.name || 'Ringlabels', ring.label, ({ center: 'NUDGE–∞ ', top: 'BOVENRAND NUDGE–∞ ', bottom: 'ONDERRAND NUDGE–∞ ' })[ring.zeroRef] + fmt(ring.offsetInput, 2) + ' MM', 'LENGTE ' + fmt(ring.length, 1) + ' MM', dateStr, n > 1 ? 'VEL ' + (p + 1) + '/' + n : '']
+      var hdr = [job.name || 'Ringlabels', ring.label, (LANG === 'en' ? { center: 'NUDGE–∞ ', top: 'TOP OF NUDGE–∞ ', bottom: 'BOTTOM OF NUDGE–∞ ' } : { center: 'NUDGE–∞ ', top: 'BOVENRAND NUDGE–∞ ', bottom: 'ONDERRAND NUDGE–∞ ' })[ring.zeroRef] + fmt(ring.offsetInput, 2) + ' MM', say('LENGTE ', 'LENGTH ') + fmt(ring.length, 1) + ' MM', dateStr, n > 1 ? say('VEL ', 'SHEET ') + (p + 1) + '/' + n : '']
         .filter(Boolean).join('   ·   ').toUpperCase();
       shapes.push(textContours(hdr, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 12 - fy]; }));
       // tweede regel: hoe ∞ en de schaal zijn berekend, zodat je op elk geprint vel ziet welke instelling is gebruikt
       var infTxt = ring.infMode === 'lens'
-        ? (ring.anchorFv !== null ? '∞ PER LENS, REFERENTIE ' + (ring.anchorLabel || 'INF ' + ring.anchorFv) : '∞ OP DEZELFDE PLEK  (GEEN REFERENTIELENS GEKOZEN)')
-        : '∞ OP DEZELFDE PLEK VOOR ELKE LENS';
-      var hdr2 = (infTxt + '   ·   SCHAAL ' + fmt(ring.mmPer1000, 2) + ' MM PER 1000').toUpperCase();
+        ? (ring.anchorFv !== null ? say('∞ PER LENS, REFERENTIE ', '∞ PER LENS, REFERENCE ') + (ring.anchorLabel || 'INF ' + ring.anchorFv) : say('∞ OP DEZELFDE PLEK  (GEEN REFERENTIELENS GEKOZEN)', '∞ AT THE SAME SPOT  (NO REFERENCE LENS CHOSEN)'))
+        : say('∞ OP DEZELFDE PLEK VOOR ELKE LENS', '∞ AT THE SAME SPOT FOR EVERY LENS');
+      var hdr2 = (infTxt + say('   ·   SCHAAL ', '   ·   SCALE ') + fmt(ring.mmPer1000, 2) + ' MM PER 1000').toUpperCase();
       shapes.push(textContours(hdr2, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 15.2 - fy]; }));
       var rx = PAGE.firstX, ry = 281;
       shapes.push(polyCmds([[rx - 0.06, ry], [rx + 100.06, ry], [rx + 100.06, ry + 0.2], [rx - 0.06, ry + 0.2]]));
@@ -1307,8 +1325,8 @@ var Engine = (function () {
         }
       }
       shapes.push(textContours('CM', 400, 1.6, 0.05, function (fx, fy) { return [rx + 101.2 + fx, ry + 5.3 - fy]; }));
-      shapes.push(textContours('PRINT OP 100% (WERKELIJKE GROOTTE)', 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 2.3 - fy]; }));
-      shapes.push(textContours('0 TOT 10 OP DE LINIAAL = PRECIES 100 MM', 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 5.3 - fy]; }));
+      shapes.push(textContours(say('PRINT OP 100% (WERKELIJKE GROOTTE)', 'PRINT AT 100% (ACTUAL SIZE)'), 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 2.3 - fy]; }));
+      shapes.push(textContours(say('0 TOT 10 OP DE LINIAAL = PRECIES 100 MM', '0 TO 10 ON THE RULER = EXACTLY 100 MM'), 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 5.3 - fy]; }));
       page.items.push({ fill: ink, contours: shapes });
 
       lenses.slice(p * PAGE.perPage, (p + 1) * PAGE.perPage).forEach(function (lens, k) {
@@ -1332,11 +1350,32 @@ var Engine = (function () {
     opts = opts || {};
     var ring = ringFor(rs), W = ring.W, page = { items: [], strips: [] }, ink = '#111111';
     var hs = [];
-    var refTxt = { center: 'het midden van de nudge', top: 'de bovenrand van de nudge (kant van het getal bovenaan)', bottom: 'de onderrand van de nudge (kant van \u221e)' }[ring.zeroRef];
-    var title = 'MEETLABEL   ·   0 = ' + ({ center: 'MIDDEN', top: 'BOVENRAND', bottom: 'ONDERRAND' })[ring.zeroRef] + ' NUDGE   ·   ' + ring.label.toUpperCase() + '   ·   LENGTE ' + fmt(ring.length, 1) + ' MM' + (ring.radius ? '' : ' (RECHT)') + (opts.date ? '   ·   ' + opts.date : '');
+    var EN = LANG === 'en';
+    var refTxt = (EN ? { center: 'the center of the nudge', top: 'the top edge of the nudge (side of the number at the top)', bottom: 'the bottom edge of the nudge (side of \u221e)' }
+      : { center: 'het midden van de nudge', top: 'de bovenrand van de nudge (kant van het getal bovenaan)', bottom: 'de onderrand van de nudge (kant van \u221e)' })[ring.zeroRef];
+    var title = (EN ? 'CALIBRATION LABEL   ·   0 = ' + ({ center: 'CENTER OF', top: 'TOP OF', bottom: 'BOTTOM OF' })[ring.zeroRef] + ' NUDGE   ·   '
+      : 'MEETLABEL   ·   0 = ' + ({ center: 'MIDDEN', top: 'BOVENRAND', bottom: 'ONDERRAND' })[ring.zeroRef] + ' NUDGE   ·   ')
+      + ring.label.toUpperCase() + say('   ·   LENGTE ', '   ·   LENGTH ') + fmt(ring.length, 1) + ' MM' + (ring.radius ? '' : say(' (RECHT)', ' (STRAIGHT)')) + (opts.date ? '   ·   ' + opts.date : '');
     hs.push(textContours(title, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 12 - fy]; }));
     var tx = PAGE.firstX + 3 * PAGE.pitch + 6, ty = 34, lh = 6.2;
-    var lines = [
+    var lines = EN ? [
+      [700, 3.0, 'How to measure the nudge to infinity'],
+      [400, 0, ''],
+      [400, 2.2, '1. Cut out a strip along the line.'],
+      [400, 2.2, '2. Stick it on the ring, with the cutout around the nudge.'],
+      [400, 2.2, '3. Turn the lens to infinity (\u221e).'],
+      [400, 2.2, '4. Read the scale at the index mark of the WCU-4.'],
+      [400, 2.2, '5. Enter that number at "Nudge to \u221e line".'],
+      [400, 0, ''],
+      [400, 1.9, '0 is ' + refTxt.split(' (')[0] + '.'],
+      [400, 1.9, ring.zeroRef === 'center' ? 'The edges of the nudge are at -' + fmt(ring.notch.h, 2) + ' and +' + fmt(ring.notch.h, 2) + ' mm.' : refTxt.indexOf('(') > -1 ? 'That is the ' + refTxt.split('(')[1].replace(')', '') + '.' : ''],
+      [400, 1.9, 'The app is currently set up the same way.'],
+      [400, 0, ''],
+      [700, 2.2, 'Checking the scale'],
+      [400, 1.9, 'Also read at the closest distance (MOD) of the lens.'],
+      [400, 1.9, 'The difference from infinity, compared with "From \u221e"'],
+      [400, 1.9, 'in the app, shows whether the scale is right for this ring.']
+    ] : [
       [700, 3.0, 'Zo meet je de nudge tot oneindig'],
       [400, 0, ''],
       [400, 2.2, '1. Knip een strook uit langs de lijn.'],
@@ -1371,7 +1410,7 @@ var Engine = (function () {
         hs.push(textContours(s0, 400, 1.6, 0.05, function (fx, fy) { return [x - off + fx, ry + 5.3 - fy]; }));
       }
     }
-    hs.push(textContours('PRINT OP 100% · 0 TOT 10 = PRECIES 100 MM', 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 2.3 - fy]; }));
+    hs.push(textContours(say('PRINT OP 100% · 0 TOT 10 = PRECIES 100 MM', 'PRINT AT 100% · 0 TO 10 = EXACTLY 100 MM'), 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 2.3 - fy]; }));
     page.items.push({ fill: '#222222', contours: hs });
 
     var n = opts.count || 3;
@@ -1619,10 +1658,502 @@ var Engine = (function () {
     setGlyphs: setGlyphs, parseLensFile: parseLensFile, ringFor: ringFor, snapshotRing: snapshotRing, presetKey: presetKey, normalizeStyle: normalizeStyle, zoneGeom: zoneGeom,
     prettyBrand: prettyBrand, brandKey: brandKey, autoBottom: autoBottom, autoTop: autoTop, tstopFrom: tstopFrom,
     layoutLens: layoutLens, buildStrip: buildStrip, buildPages: buildPages,
-    pageSVG: pageSVG, buildPDF: buildPDF, textWidth: textWidth, distOf: distOf, buildCalibPages: buildCalibPages
+    pageSVG: pageSVG, buildPDF: buildPDF, textWidth: textWidth, distOf: distOf, buildCalibPages: buildCalibPages,
+    setLang: setLang, lang: function () { return LANG; }
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
+
+</script>
+<script>
+// Focusringlabels — taalkeuze (Nederlands / Engels).
+// De app is in het Nederlands geschreven. In het Engels vertaalt deze laag alle tekst in de pagina,
+// ook wat de app later tekent (meldingen, panelen), via een woordenboek en een lijst patronen.
+// Tekst in SVG (de vellen) vertaalt de rekenkern zelf, via Engine.setLang.
+var I18N = (function () {
+  'use strict';
+  var KEY = 'focusringlabels.lang';
+
+  // ---------- woordenboek: hele zinnen en labels ----------
+  var EXACT = {
+    // kop en tabbladen
+    'WCU-4 · Tilta-ring': 'WCU-4 · Tilta ring',
+    'Installeren als app': 'Install as app',
+    'Printen': 'Print',
+    'PDF downloaden': 'Download PDF',
+    'Geschiedenis': 'History',
+    'Ongedaan maken': 'Undo',
+    'Opnieuw': 'Redo',
+    'Instellingen': 'Settings',
+    'Bibliotheek': 'Library',
+    'Opmaak': 'Style',
+    'Ring': 'Ring',
+    'Export': 'Export',
+    'Voorbeeld van de vellen': 'Sheet preview',
+    'Zoom': 'Zoom',
+
+    // bibliotheek
+    'Lenzen': 'Lenses',
+    'Lenzen laden': 'Load lenses',
+    'Map laden': 'Load folder',
+    'Of sleep .tl-bestanden hierheen. Elke lens komt vanzelf in de map van zijn merk.': 'Or drag .tl files here. Each lens goes into the folder of its brand automatically.',
+    '+ Nieuwe map': '+ New folder',
+    'Nieuwe map': 'New folder',
+    'Naam van de map, bovenaan het vel': 'Folder name, at the top of the sheet',
+    'Map verwijderen': 'Delete folder',
+    'Lege map. Verplaats een lens hierheen via het paneel rechts.': 'Empty folder. Move a lens here from the panel on the right.',
+    'Naar voren': 'Move up',
+    'Naar achteren': 'Move down',
+    'Weer op het vel zetten': 'Put back on the sheet',
+    'Niet op het vel zetten': 'Leave off the sheet',
+    'Geen .tl-bestanden gevonden': 'No .tl files found',
+    '1 stond er al in': '1 was already there',
+    'Nog geen back-up van je bibliotheek gemaakt.': 'No backup of your library yet.',
+    'Laatste back-up: vandaag.': 'Last backup: today.',
+    'Laatste back-up: gisteren.': 'Last backup: yesterday.',
+    'Zonder merk': 'No brand',
+
+    // opmaak
+    'Startpunt': 'Preset',
+    'Inkt voor cijfers en streepjes': 'Ink for numbers and ticks',
+    'Inktkleur': 'Ink color',
+    'Op het label': 'On the label',
+    'Tussenstreepjes': 'Minor ticks',
+    'Lensnaam onderaan': 'Lens name at the bottom',
+    'T-stop bovenaan': 'T-stop at the top',
+    'Kleurvlakken aanpassen': 'Edit color areas',
+    'Eén vlak over het hele label': 'One area across the whole label',
+    'Sierstrepen': 'Accent stripes',
+    'Gemeten vanaf de linkerrand. Het mooist in of naast de rand links.': 'Measured from the left edge. Looks best in or next to the left band.',
+    '+ Streep': '+ Stripe',
+    'Omlijning': 'Outline',
+    'aan': 'on',
+    'Lijn om het hele label': 'Line around the whole label',
+    'Kleur': 'Color',
+    'Plaats': 'Position',
+    'Binnen de rand': 'Inside the edge',
+    'Op de snijlijn': 'On the cut line',
+    'Buiten de rand': 'Outside the edge',
+    'Dikte': 'Thickness',
+    'zichtbaar op de print': 'visible on the print',
+    'De lijn staat helemaal op het label, langs de rand en om de nudge heen.': 'The line sits fully on the label, along the edge and around the nudge.',
+    'De lijn ligt half op het label. Snij precies door het midden van de lijn.': 'Half of the line is on the label. Cut exactly through the middle of the line.',
+    'De lijn ligt buiten het label. Snij langs de binnenkant van de lijn, dan zie je hem niet meer op het label.': 'The line is outside the label. Cut along the inside of the line, so it no longer shows on the label.',
+    'Opmaak bewaren…': 'Save style…',
+    'Naam van deze opmaak': 'Name of this style',
+    'Bijvoorbeeld Dulens geel': 'For example Dulens yellow',
+    'Bewaren': 'Save',
+    'Annuleren': 'Cancel',
+    'Maak standaard': 'Make default',
+    'Dit is je standaard': 'This is your default',
+    'Op alle mappen': 'Apply to all folders',
+    'Bewaarde opmaak': 'Saved styles',
+    'Naam van bewaarde opmaak': 'Name of saved style',
+    'Komt bij de startpunten onder Mijn opmaak, en gaat mee in je bibliotheek.': 'Goes into the presets under My styles, and is saved with your library.',
+    'Mijn opmaak': 'My styles',
+    'Mijn standaard': 'My default',
+    'eigen opmaak': 'custom style',
+    'Rand links': 'Left band',
+    'Vlak links': 'Left area',
+    'Vlak rechts': 'Right area',
+    'Rand rechts': 'Right band',
+    'Hele label': 'Whole label',
+    '0 = geen rand': '0 = no band',
+    'Grens links / rechts': 'Left / right boundary',
+    'vanaf linkerrand': 'from the left edge',
+    'Effen kleur': 'Solid color',
+    'Verloop dwars ↔': 'Gradient across ↔',
+    'Verloop langs ↕': 'Gradient along ↕',
+    'Verloop 4 hoeken': 'Gradient, 4 corners',
+    'Links': 'Left',
+    'Rechts': 'Right',
+    'Boven': 'Top',
+    'Onder': 'Bottom',
+    'Linksboven': 'Top left',
+    'Rechtsboven': 'Top right',
+    'Linksonder': 'Bottom left',
+    'Rechtsonder': 'Bottom right',
+    'Verloop omdraaien': 'Reverse gradient',
+    'Kleur toevoegen aan het verloop': 'Add a color to the gradient',
+    'Middelste kleur weghalen': 'Remove middle color',
+    'Vanaf rand (mm)': 'From edge (mm)',
+    'Breedte (mm)': 'Width (mm)',
+    'Streep weghalen': 'Remove stripe',
+
+    // groepen en namen van de startpunten
+    'Effen': 'Solid',
+    'Speciaal': 'Special',
+    'Donker': 'Dark',
+    'Verloop': 'Gradient',
+    'Heel label': 'Full label',
+    'Creatief': 'Creative',
+    'Teal / geel': 'Teal / yellow',
+    'Oranje': 'Orange',
+    'Rood': 'Red',
+    'Roze': 'Pink',
+    'Paars': 'Purple',
+    'Blauw': 'Blue',
+    'Groen': 'Green',
+    'Olijf': 'Olive',
+    'Geel / zwart': 'Yellow / black',
+    'Grijs': 'Gray',
+    'Zwart / wit': 'Black / white',
+    'Hoog contrast': 'High contrast',
+    'Dubbele rand': 'Double band',
+    'Minimaal': 'Minimal',
+    'Accent rechts': 'Right accent',
+    'Nacht': 'Night',
+    'Grafiet': 'Graphite',
+    'Zonsondergang': 'Sunset',
+    'Oceaan': 'Ocean',
+    'Koper': 'Copper',
+    'Heel label: zomer': 'Full label: summer',
+    'Heel label: lagune': 'Full label: lagoon',
+    'Heel label: roos': 'Full label: rose',
+    'Heel label: nacht': 'Full label: night',
+    'Racestreep': 'Racing stripe',
+    'Avondrood': 'Afterglow',
+    'Pastel regenboog': 'Pastel rainbow',
+    'Holografisch': 'Holographic',
+    'Goud': 'Gold',
+    'Chroom': 'Chrome',
+    'IJs': 'Ice',
+
+    // ring
+    'Ringprofiel': 'Ring profile',
+    '∞ en schaal': '∞ and scale',
+    'Plek van ∞': 'Position of ∞',
+    'Per lens, volgens het lensbestand': 'Per lens, from the lens file',
+    'Op dezelfde plek voor elke lens': 'Same spot for every lens',
+    'Referentielens': 'Reference lens',
+    '— kies de lens waarmee je hebt gemeten —': '— choose the lens you measured with —',
+    'Eerdere referentie': 'Previous reference',
+    'referentie': 'reference',
+    'Kies de lens waarmee je de ∞-afstand hebt gemeten. Tot die tijd staat ∞ bij elke lens op dezelfde plek.': 'Choose the lens you measured the ∞ distance with. Until then, ∞ sits at the same spot for every lens.',
+    'Geldt voor elke map met dit profiel.': 'Applies to every folder with this profile.',
+    'Maten van de ring': 'Ring dimensions',
+    'Meet de ∞-afstand vanaf': 'Measure the ∞ distance from',
+    'Onderrand van de nudge (kant van ∞)': 'Bottom edge of the nudge (∞ side)',
+    'Bovenrand van de nudge': 'Top edge of the nudge',
+    'Midden van de nudge': 'Center of the nudge',
+    'Profiel beheren': 'Manage profile',
+    'Naam': 'Name',
+    'Kopie maken': 'Make a copy',
+    'Verwijderen': 'Delete',
+    'Nieuw profiel met de originele maten': 'New profile with the original dimensions',
+    'Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.': 'Tilta ARRI ring: an ARRI-size ring on the Tilta ARRI adapter of the Nucleus-M II, not the Tilta ring that comes with it.',
+    'Tilta ARRI-ring op Nucleus-M II': 'Tilta ARRI ring on Nucleus-M II',
+    'ARRI WCU-4-ring': 'ARRI WCU-4 ring',
+    'Mijn ring': 'My ring',
+    'Mijn opgeslagen standaard': 'My saved default',
+    'Meetlabel': 'Calibration label',
+    'Een strook met een mm-schaal vanaf de nudge. Hiermee meet je waar ∞ valt.': 'A strip with a mm scale starting at the nudge. Use it to measure where ∞ falls.',
+    'Meetlabel downloaden': 'Download calibration label',
+    'Mal voor de Tilta ARRI-ring': 'Jig for the Tilta ARRI ring',
+    'De mal met een label erin: lijmkant boven, uitsparing over de nok': 'The jig with a label in it: adhesive side up, cutout over the key',
+    'Label met de lijmkant boven in de goot, uitsparing over de nok. Print de mal plat en zonder support.': 'Put the label adhesive side up in the groove, cutout over the key. Print the jig flat, without supports.',
+    'Mal downloaden (STL)': 'Download jig (STL)',
+    'Mal voor de Tilta ARRI-ring (STL)': 'Jig for the Tilta ARRI ring (STL)',
+    'Nudge tot ∞-lijn': 'Nudge to ∞ line',
+    'Nudge tot ∞-lijn:': 'Nudge to ∞ line:',
+    'midden tot midden': 'center to center',
+    'Schaal': 'Scale',
+    'Schaal:': 'Scale:',
+    'mm per 1000 lens-eenheden': 'mm per 1000 lens units',
+    'Nudge: diepte': 'Nudge: depth',
+    'Nudge: breedte': 'Nudge: width',
+    'langs de strook': 'along the strip',
+    'Nudge: afronding bovenkant': 'Nudge: top corner radius',
+    'Nudge: afronding onderkant': 'Nudge: bottom corner radius',
+    '0 = rechte hoek': '0 = square corner',
+    'Lengte strook': 'Strip length',
+    'korter = minder overlap': 'shorter = less overlap',
+    'Breedte strook': 'Strip width',
+    'hoogte van de ring': 'height of the ring',
+    'Kromming': 'Curvature',
+    'straal, 0 = recht': 'radius, 0 = straight',
+    'Lege zone onderaan': 'Empty zone at the bottom',
+    'vanaf midden nudge': 'from nudge center',
+    'vanaf bovenrand nudge': 'from top edge of nudge',
+    'vanaf onderrand nudge': 'from bottom edge of nudge',
+    '⚠ ∞ staat nu bij elke lens op dezelfde plek, omdat er geen referentielens is gekozen.': '⚠ ∞ now sits at the same spot for every lens, because no reference lens has been chosen.',
+    'Kies de lens waarmee je hebt gemeten': 'Choose the lens you measured with',
+
+    // export
+    'Downloaden': 'Download',
+    'PDF van alle mappen': 'PDF of all folders',
+    'Resolutie van de PNG': 'PNG resolution',
+    'Automatisch bewaren in een bestand…': 'Auto-save to a file…',
+    'Bestand openen en koppelen…': 'Open and link a file…',
+    'Ander bestand kiezen…': 'Choose another file…',
+    'Loskoppelen': 'Unlink',
+    'Bibliotheek opslaan': 'Save library',
+    'Bibliotheek openen': 'Open library',
+    'Bibliotheek bewaren': 'Save library',
+    'De app, de link en het losse bestand hebben elk hun eigen opslag.': 'The app, the link and the standalone file each keep their own storage.',
+    'Sneltoetsen': 'Keyboard shortcuts',
+    'Tabbladen': 'Tabs',
+    'Koppel je bibliotheek aan een bestand, bijvoorbeeld in iCloud Drive. Elke wijziging komt er vanzelf in.': 'Link your library to a file, for example in iCloud Drive. Every change goes into it automatically.',
+    'Verbinden': 'Connect',
+    'Printen: kies in Chrome "Marges: Geen" en "Schaal: Standaard". Of download de PDF.': 'Printing: in Chrome choose "Margins: None" and "Scale: Default". Or download the PDF.',
+    'Werk je offline? Open het losse HTML-bestand in Chrome; dan kun je ook direct printen.': 'Working offline? Open the standalone HTML file in Chrome; then you can print directly too.',
+    'Downloaden kan niet in deze weergave. Open het losse HTML-bestand in Chrome om PDF\'s te maken.': 'Downloading is not possible in this view. Open the standalone HTML file in Chrome to make PDFs.',
+
+    // voorbeeld en detailpaneel
+    'Laad lensbestanden om te beginnen.': 'Load lens files to get started.',
+    'nog geen stroken': 'no strips yet',
+    'Laad een of meer .tl-bestanden om stroken te maken. Elk bestand wordt één strook.': 'Load one or more .tl files to make strips. Each file becomes one strip.',
+    'T-stop': 'T-stop',
+    'Vul per lens de T-stop in. Leeg = geen T-stop op het label.': 'Enter the T-stop per lens. Empty = no T-stop on the label.',
+    'Nudge': 'Nudge',
+    'Strook': 'Strip',
+    'Map': 'Folder',
+    'Tekst bovenaan': 'Text at the top',
+    'Tekst onderaan (verticaal)': 'Text at the bottom (vertical)',
+    'Leeg laten = automatische tekst.': 'Leave empty = automatic text.',
+    'geen ∞ in bestand': 'no ∞ in file',
+    'Schaal nameten': 'Re-measure the scale',
+    'Schaal meten met het meetlabel': 'Measure the scale with the calibration label',
+    'Dit lensbestand heeft geen oneindig (INF). Kies een andere lens.': 'This lens file has no infinity (INF). Choose another lens.',
+    'Afgelezen bij oneindig (∞)': 'Reading at infinity (∞)',
+    'Afgelezen bij oneindig in mm': 'Reading at infinity in mm',
+    'Afstand op de lens': 'Distance on the lens',
+    'Afgelezen bij de gekozen afstand in mm': 'Reading at the chosen distance in mm',
+    'Toepassen op ring en nudge': 'Apply to ring and nudge',
+    'De afstand moet verder op het label liggen dan oneindig. Controleer de getallen.': 'The distance must lie further along the label than infinity. Check the numbers.',
+    'Deze schaal is erg anders dan normaal. Controleer of je bij de juiste afstand hebt afgelezen.': 'This scale is very different from normal. Check that you read at the right distance.',
+    'Cijfers per afstand': 'Numbers per distance',
+    'Auto kiest zelf. R = groot cijfer rechts, L = klein cijfer links, – = alleen een streepje. Het lijntje onder een knop toont wat auto kiest.': 'Auto decides for you. R = large number on the right, L = small number on the left, – = tick only. The line under a button shows what auto picks.',
+    'Afstand': 'Distance',
+    'Vanaf ∞': 'From ∞',
+    'Auto': 'Auto',
+    'Automatisch': 'Automatic',
+    'Rechts, groot': 'Right, large',
+    'Links, klein': 'Left, small',
+    'Geen cijfer': 'No number',
+    'Alles terug op auto': 'Reset all to auto',
+
+    // meldingen
+    'Er staat al een opslagvenster open. Probeer het zo opnieuw.': 'A save dialog is already open. Try again in a moment.',
+    'Opslaan lukt hier niet. Open de app als los bestand in Chrome om te downloaden.': 'Saving does not work here. Open the app as a standalone file in Chrome to download.',
+    'Downloaden is in deze weergave niet beschikbaar. Open de app als los bestand in Chrome.': 'Downloading is not available in this view. Open the app as a standalone file in Chrome.',
+    'Er staan geen stroken op het vel. Laad eerst een lensbestand.': 'There are no strips on the sheet. Load a lens file first.',
+    'het vel is te groot voor deze browser; kies een lagere resolutie': 'the sheet is too large for this browser; choose a lower resolution',
+    'Ongedaan gemaakt': 'Undone',
+    'Opnieuw gedaan': 'Redone',
+    'Klik op Verbinden bij Export.': 'Click Connect under Export.',
+    'Geopend. Zonder toestemming kan de app er niet automatisch in bewaren.': 'Opened. Without permission the app cannot save to it automatically.',
+    'Losgekoppeld. Het bestand zelf blijft gewoon staan.': 'Unlinked. The file itself stays where it is.',
+    'Geïnstalleerd. Je vindt Focusringlabels nu in Launchpad; zet hem in je Dock.': 'Installed. You will now find Focusringlabels in Launchpad; add it to your Dock.',
+    'Er is een nieuwe versie van Focusringlabels.': 'A new version of Focusringlabels is available.',
+    'Nu bijwerken': 'Update now',
+    'Je hebt nog geen back-up van je bibliotheek.': 'You do not have a backup of your library yet.',
+    'Bewaren in bestand': 'Save to file',
+    'Nu opslaan': 'Save now',
+    'Openen': 'Open',
+    'Heb je al een bibliotheek? Open hem hier en hij wordt voortaan automatisch bewaard.': 'Already have a library? Open it here and it will be saved automatically from now on.',
+
+    // namen en bestandsnamen die de app zelf bedenkt (via T)
+    '(kopie)': '(copy)',
+    '(mijn maten)': '(my dimensions)',
+    'Bestand': 'File',
+    'Alle_mappen': 'All_folders',
+    'Focusringlabels bibliotheek.json': 'Focusringlabels library.json',
+    'Focusringlabels-bibliotheek': 'Focusringlabels library',
+    'Focusringlabels_bibliotheek_': 'Focusringlabels_library_',
+    'Meetlabel nudge': 'Calibration label nudge',
+    'Meetlabel_nudge_': 'Calibration_label_nudge_',
+    '_vel': '_sheet',
+    'tekenen mislukt': 'drawing failed'
+  };
+
+  var REF_EN = { 'het midden': 'the center', 'de bovenrand': 'the top edge', 'de onderrand': 'the bottom edge' };
+  var ZONE = '(Rand links|Vlak links|Vlak rechts|Rand rechts|Hele label)';
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function lensWord(n, w) { return n + (w === 'lens' ? ' lens' : ' lenses'); }
+
+  // ---------- patronen: zinnen met een naam of getal erin ----------
+  // {n} = deel n ook vertalen, $n = deel n letterlijk overnemen
+  var PAT = [
+    [/^(\d+) (lens|lenzen)$/, function (m) { return lensWord(m[1], m[2]); }],
+    [/^(\d+) lenzen toegevoegd in ((?:(?! · ).)+)$/, '$1 lenses added to $2'],
+    [/^((?:(?! · ).)+) mm toegevoegd$/, '$1 mm added'],
+    [/^(\d+) stonden er al in$/, '$1 were already there'],
+    [/^(\d+) andere bestanden overgeslagen$/, '$1 other files skipped'],
+    [/^Bibliotheek (.*) geopend$/, 'Library $1 opened'],
+    [/^(.+) is geen Focusringlabels-bibliotheek\. Lensbestanden laad je via "Lenzen laden"\.$/, '{1} is not a Focusringlabels library. Load lens files with "Load lenses".'],
+    [/^(.+) is geen Focusringlabels-bibliotheek\.$/, '{1} is not a Focusringlabels library.'],
+    [/^(.+) is geen bibliotheekbestand\.$/, '$1 is not a library file.'],
+    [/^(Naar voren|Naar achteren|Weer op het vel zetten|Niet op het vel zetten|Verwijderen) \((.*)\)$/, '{1} ($2)'],
+    [/^Map (.+) met (\d+) (lens|lenzen) verwijderd$/, function (m) { return 'Folder ' + m[1] + ' with ' + lensWord(m[2], m[3]) + ' deleted'; }],
+    [/^Map (.+) verwijderd$/, 'Folder $1 deleted'],
+    [/^Profiel (.+) verwijderd; (.+) gebruikt nu (.+)$/, 'Profile $1 deleted; $2 now uses $3'],
+    [/^Profiel (.+) verwijderd$/, 'Profile $1 deleted'],
+    [/^Profiel (.+) gemaakt en gekozen voor (.+)$/, 'Profile $1 created and chosen for $2'],
+    [/^(.+) verwijderd$/, '$1 deleted'],
+    [/^(.+) verwijderen$/, 'Delete $1'],
+    [/^(.+) mm verplaatst naar (.+)$/, '$1 mm moved to $2'],
+    [/^Startpunt: (.+)$/, 'Preset: {1}'],
+    [/^Startpunt (.+)$/, 'Preset {1}'],
+    [/^(.+), aangepast$/, '{1}, modified'],
+    [/^(\d+) aangepast$/, '$1 changed'],
+    [/^Kleur van streep (\d+)$/, 'Color of stripe $1'],
+    [/^Streep (\d+) weghalen$/, 'Remove stripe $1'],
+    [/^Vulling (.+)$/, 'Fill {1}'],
+    [new RegExp('^' + ZONE + ' kleur (\\d+)$'), '{1} color $2'],
+    [new RegExp('^' + ZONE + ' (links|rechts|boven|onder|linksboven|rechtsboven|linksonder|rechtsonder|kleur)$'),
+      function (m, tr) { return tr(m[1]) + ' ' + tr(cap(m[2])).toLowerCase(); }],
+    [/^Verloop omdraaien voor (.+)$/, 'Reverse gradient for {1}'],
+    [/^Kleur toevoegen aan het verloop van (.+)$/, 'Add a color to the gradient of {1}'],
+    [/^Kleur weghalen uit het verloop van (.+)$/, 'Remove a color from the gradient of {1}'],
+    [/^(.+) in mm$/, '{1} in mm'],
+    [/^∞ (.+), (vanaf (?:midden|bovenrand|onderrand) nudge)$/, '∞ {1}, {2}'],
+    [/^(.+) {2}\(∞ = (.+)\)$/, '{1}  (∞ = $2)'],
+    [/^Andere lenzen schuiven mee met hun eigen ∞-waarde\. Een lagere waarde dan (.+) zet ∞ verder van de nudge\.$/, 'Other lenses shift with their own ∞ value. A value lower than $1 puts ∞ further from the nudge.'],
+    [/^Referentie: (.+)\. De ∞-afstand geldt nu voor deze lens\.$/, 'Reference: $1. The ∞ distance now applies to this lens.'],
+    [/^Deze map heeft nog geen lenzen op het vel\. Laad \.tl-bestanden of verplaats een lens naar (.+)\.$/, 'This folder has no lenses on the sheet yet. Load .tl files or move a lens to $1.'],
+    [/^(\d+) (strook|stroken) op (\d+) (vel|vellen) A4$/, function (m) { return m[1] + (m[2] === 'strook' ? ' strip' : ' strips') + ' on ' + m[3] + (m[4] === 'vel' ? ' A4 sheet' : ' A4 sheets'); }],
+    [/^Plak het meetlabel op de ring \(0 = (het midden|de bovenrand|de onderrand) van de nudge\)\. Lees af bij ∞ en bij een korte afstand op de lens\.$/,
+      function (m) { return 'Stick the calibration label on the ring (0 = ' + REF_EN[m[1]] + ' of the nudge). Take a reading at ∞ and at a short distance on the lens.'; }],
+    [/^Afgelezen bij (.+) (m|ft)( \(valt buiten het label\))?$/, function (m) { return 'Reading at ' + m[1] + ' ' + m[2] + (m[3] ? ' (falls outside the label)' : ''); }],
+    [/^De app verwacht nu bij (.+) m: (.+) mm\. Bij oneindig: (.+) mm\.$/, 'At $1 m the app now expects $2 mm. At infinity: $3 mm.'],
+    [/^\(nu (.+)\)$/, '(now $1)'],
+    [/^vanaf (het midden|de bovenrand|de onderrand)$/, function (m) { return 'from ' + REF_EN[m[1]]; }],
+    [/^Toegepast op profiel (.+)$/, 'Applied to profile $1'],
+    [/^T-stop van (.*) mm$/, 'T-stop of $1 mm'],
+    [/^Lege vakjes vullen met T(.*)$/, 'Fill empty boxes with T$1'],
+    [/^Alle lenzen in (.+) hebben al een T-stop\.$/, 'All lenses in $1 already have a T-stop.'],
+    [/^T(.+) ingevuld bij (\d+) (lens|lenzen)$/, function (m) { return 'T' + m[1] + ' filled in for ' + lensWord(m[2], m[3]); }],
+    [/^Kies een lens in (.+) om de strook te bekijken\.$/, 'Choose a lens in $1 to view the strip.'],
+    [/^Uitsparing (.+) × (.+) mm\. ∞ ligt (.+) mm onder (het midden|de bovenrand|de onderrand) van de nudge\.$/,
+      function (m) { return 'Cutout ' + m[1] + ' × ' + m[2] + ' mm. ∞ is ' + m[3] + ' mm below ' + REF_EN[m[4]] + ' of the nudge.'; }],
+    [/^(.*) {2}\(automatisch\)$/, '$1  (automatic)'],
+    [/^(\d+) afstanden$/, '$1 distances'],
+    [/^(\d+) tussenstreepjes$/, '$1 minor ticks'],
+    [/^(.+) valt buiten de ring$/, '$1 falls outside the ring'],
+    [/^(\d+) zonder cijfer$/, '$1 without a number'],
+    [/^(\d+) overlapt$/, '$1 overlapping'],
+    [/^Plaats van (.+)$/, 'Position of $1'],
+    [/^Bron: (.+)$/, 'Source: $1'],
+    [/^Bewaard als (.+)\. Je vindt hem bij de startpunten onder Mijn opmaak\.$/, 'Saved as $1. You will find it among the presets under My styles.'],
+    [/^Bewaard als (.+)$/, 'Saved as $1'],
+    [/^Vervangt de bewaarde opmaak (.+)\.$/, 'Replaces the saved style $1.'],
+    [/^Opmaak van (.+) is je standaard\. Nieuwe mappen krijgen deze opmaak\.$/, 'The style of $1 is now your default. New folders get this style.'],
+    [/^Opmaak van (.+) op alle mappen gezet$/, 'Style of $1 applied to all folders'],
+    [/^Laatste back-up: (\d+) dagen geleden\.$/, 'Last backup: $1 days ago.'],
+    [/^Wordt automatisch bewaard in (.+?)(?: · laatst om (\d\d:\d\d))?\. Alles wat in de app staat, komt in dat bestand\.$/,
+      function (m) { return 'Saved automatically to ' + m[1] + (m[2] ? ' · last at ' + m[2] : '') + '. Everything in the app goes into that file.'; }],
+    [/^Wordt automatisch bewaard in (.+)\.$/, 'Saved automatically to $1.'],
+    [/^Gebruikt door: (.+)$/, function (m) { return 'Used by: ' + (m[1] === 'geen map' ? 'no folder' : m[1]); }],
+    [/^PDF maken mislukt: (.*)$/, 'Making the PDF failed: {1}'],
+    [/^Meetlabel maken mislukt: (.*)$/, 'Making the calibration label failed: {1}'],
+    [/^PNG maken mislukt: (.*)$/, 'Making the PNG failed: {1}'],
+    [/^PNG op (\d+) dpi maken…$/, 'Making PNG at $1 dpi…'],
+    [/^Ongedaan maken \((.+)\)$/, 'Undo ($1)'],
+    [/^Opnieuw \((.+)\)$/, 'Redo ($1)'],
+    [/^Bewaard in (.+)$/, 'Saved to $1'],
+    [/^Bewaren in (.+) lukte niet\.(?: (.*))?$/, function (m, tr) { return 'Saving to ' + m[1] + ' failed.' + (m[2] ? ' ' + tr(m[2]) : ''); }],
+    [/^Gekoppeld aan (.+)\. Chrome vraagt opnieuw toestemming om daarin te bewaren\.$/, 'Linked to $1. Chrome is asking again for permission to save there.'],
+    [/^Koppelen lukte niet: (.*)$/, 'Linking failed: $1'],
+    [/^Openen lukte niet: (.*)$/, 'Opening failed: $1'],
+    [/^Je bibliotheek wordt bewaard in (.+)\. Geef Chrome even toestemming\.$/, 'Your library is saved to $1. Please give Chrome permission.'],
+    [/^Je laatste back-up is (\d+) dagen oud\.$/, 'Your last backup is $1 days old.'],
+    [/^Versie (.+)$/, 'Version $1']
+  ];
+
+  var has = Object.prototype.hasOwnProperty;
+  function sub(tpl, m) {
+    return tpl.replace(/\{(\d)\}|\$(\d)/g, function (_, a, b) { return a ? tr(m[+a] || '') : (m[+b] || ''); });
+  }
+  function core(t) {
+    if (has.call(EXACT, t)) return EXACT[t];
+    for (var i = 0; i < PAT.length; i++) {
+      var m = PAT[i][0].exec(t);
+      if (m) return typeof PAT[i][1] === 'function' ? PAT[i][1](m, tr) : sub(PAT[i][1], m);
+    }
+    // meldingen die uit losse zinnen bestaan, gescheiden door ' · '
+    if (t.indexOf(' · ') > -1) {
+      var hit = false, parts = t.split(' · ').map(function (p) { var r = core(p); if (r !== null) { hit = true; return r; } return p; });
+      if (hit) return parts.join(' · ');
+    }
+    return null;
+  }
+  // vertaal één tekst; witruimte voor en achter blijft staan
+  function tr(s) {
+    if (typeof s !== 'string' || !s) return s;
+    var t = s.trim();
+    if (!t || !/[A-Za-zÀ-ÿ]/.test(t)) return s;
+    var out = core(t);
+    if (out === null) return s;
+    return s.slice(0, s.indexOf(t)) + out + s.slice(s.indexOf(t) + t.length);
+  }
+
+  // ---------- de pagina vertalen, ook alles wat later verschijnt ----------
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  var ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
+  function skipEl(e) { return e.namespaceURI === SVGNS || e.nodeName === 'SCRIPT' || e.nodeName === 'STYLE' || e.nodeName === 'TEXTAREA' || e.hasAttribute('data-notr'); }
+  function doText(n) {
+    var p = n.parentNode;
+    if (!p || p.nodeType !== 1 || skipEl(p)) return;
+    var v = tr(n.data);
+    if (v !== n.data) n.data = v;
+  }
+  function doAttrs(e) {
+    for (var i = 0; i < ATTRS.length; i++) {
+      var a = ATTRS[i], v = e.getAttribute(a);
+      if (v) { var w = tr(v); if (w !== v) e.setAttribute(a, w); }
+    }
+  }
+  function walk(root) {
+    if (root.nodeType === 3) { doText(root); return; }
+    if (root.nodeType !== 1 || skipEl(root)) return;
+    doAttrs(root);
+    var w = document.createTreeWalker(root, 5, { acceptNode: function (n) { return n.nodeType === 1 && skipEl(n) ? 2 : 1; } });
+    var n;
+    while ((n = w.nextNode())) { if (n.nodeType === 3) doText(n); else doAttrs(n); }
+  }
+  function inSkipped(n) {
+    for (var p = n.nodeType === 1 ? n : n.parentNode; p && p.nodeType === 1; p = p.parentNode) if (skipEl(p)) return true;
+    return false;
+  }
+
+  function pick(libKey) {
+    try {
+      var v = localStorage.getItem(KEY);
+      if (v === 'nl' || v === 'en') return v;
+      if (libKey && localStorage.getItem(libKey)) return 'nl';   // bestaande bibliotheek: dat was Nederlands
+    } catch (e) {}
+    return /^nl\b/i.test(navigator.language || '') ? 'nl' : 'en';
+  }
+  function save(l) { try { localStorage.setItem(KEY, l); return true; } catch (e) { return false; } }
+
+  var started = false;
+  function start(lang) {
+    document.documentElement.lang = lang;
+    if (lang !== 'en' || started) return;
+    started = true;
+    walk(document.body);
+    new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i];
+        if (r.type === 'childList') {
+          if (inSkipped(r.target)) continue;
+          for (var j = 0; j < r.addedNodes.length; j++) walk(r.addedNodes[j]);
+        } else if (r.type === 'characterData') {
+          if (r.target.nodeType === 3) doText(r.target);
+        } else if (r.type === 'attributes') {
+          var e = r.target;
+          if (!inSkipped(e)) { var v = e.getAttribute(r.attributeName); if (v) { var w = tr(v); if (w !== v) e.setAttribute(r.attributeName, w); } }
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+  }
+
+    // voor namen en bestandsnamen die de app zelf maakt
+  function T(lang) { return lang === 'en' ? tr : function (s) { return s; }; }
+
+  return { pick: pick, save: save, start: start, tr: tr, T: T, EXACT: EXACT, PAT: PAT };
+})();
 
 </script>
 <script>
@@ -1638,6 +2169,21 @@ var KEY2 = 'focusringlabels.v2', KEY1 = 'focusringlabels.v1';
 var PRESET_CYCLE = ['teal-geel', 'oranje', 'blauw', 'roze', 'groen', 'paars', 'rood', 'mint', 'geel-zwart', 'olijf', 'grijs', 'zwart-wit'];
 var ZONE_NAMES = { bandL: 'Rand links', left: 'Vlak links', right: 'Vlak rechts', bandR: 'Rand rechts' };
 var $ = function (id) { return document.getElementById(id); };
+// ---------- taal: Nederlands of Engels ----------
+// Engels: I18N vertaalt alle tekst in de pagina, ook wat later verschijnt; de vellen vertaalt Engine zelf.
+var LANG = I18N.pick(KEY2), T = I18N.T(LANG);
+I18N.save(LANG);   // keuze vastleggen, anders wordt het na de eerste keer Nederlands (dan is er een bibliotheek)
+Engine.setLang(LANG);
+I18N.start(LANG);
+$('langSel').value = LANG;
+$('langSel').addEventListener('change', function () {
+  var l = this.value;
+  if (l === LANG) return;
+  I18N.save(l);
+  try { flushSave(); } catch (e) {}
+  location.reload();
+});
+function dec(s) { return LANG === 'en' ? String(s) : String(s).replace('.', ','); }
 // inklapbare onderdelen: open/dicht blijft bewaard, ook na opnieuw tekenen
 var OPEN = {}; try { OPEN = JSON.parse(localStorage.getItem('focusringlabels.open') || '{}') || {}; } catch (e) { OPEN = {}; }
 function keepOpen(d) {
@@ -1677,7 +2223,7 @@ function newFolder(name, key, presetKey) {
 var JIG_FILE = 'Focusringlabels_mal_Tilta-ARRI-ring.stl';
 var JIG_URL = (window.__PWA__ ? '' : 'https://stefanspoelstra.github.io/focusringlabels/') + 'mal/' + JIG_FILE;
 function isTiltaRing(prof) { return !!(prof && prof.ring && Engine.presetKey(prof.ring.preset) === 'tilta-nucleus'); }
-var TEMPLATE_NAMES = { 'tilta-nucleus': 'Tilta ARRI-ring op Nucleus-M II', 'arri-wcu4': 'ARRI WCU-4-ring' };
+var TEMPLATE_NAMES = { 'tilta-nucleus': T('Tilta ARRI-ring op Nucleus-M II'), 'arri-wcu4': T('ARRI WCU-4-ring') };
 // v17: oude profielnamen en sleutels van de ARRI-ring opschonen
 function migr17(j) {
   if (j.migr >= 17) return;
@@ -1711,14 +2257,14 @@ function toV3(j) {
   if (Array.isArray(j.profiles) && j.profiles.length) {
     j.profiles.forEach(function (x) { if (!x.id) x.id = uid('p'); x.ring = Engine.snapshotRing(x.ring || {}); if (!x.name) x.name = 'Ring'; });
   } else {
-    var main = (function () { var r = Engine.ringFor(j.ring || {}); return { id: uid('p'), name: TEMPLATE_NAMES[r.preset] || 'Mijn ring', ring: Engine.snapshotRing(j.ring || {}) }; })();
+    var main = (function () { var r = Engine.ringFor(j.ring || {}); return { id: uid('p'), name: TEMPLATE_NAMES[r.preset] || T('Mijn ring'), ring: Engine.snapshotRing(j.ring || {}) }; })();
     j.profiles = [main];
     var d = j.defaults && j.defaults.ring && j.defaults.ring.ring;
-    if (d && JSON.stringify(Engine.snapshotRing(d)) !== JSON.stringify(main.ring)) j.profiles.push({ id: uid('p'), name: 'Mijn opgeslagen standaard', ring: Engine.snapshotRing(d) });
+    if (d && JSON.stringify(Engine.snapshotRing(d)) !== JSON.stringify(main.ring)) j.profiles.push({ id: uid('p'), name: T('Mijn opgeslagen standaard'), ring: Engine.snapshotRing(d) });
     Object.keys(TEMPLATE_NAMES).forEach(function (k) {
       if (main.ring.preset !== k) j.profiles.push({ id: uid('p'), name: TEMPLATE_NAMES[k], ring: Engine.snapshotRing({ preset: k }) });
     });
-    if (main.name === 'Mijn ring' || JSON.stringify(main.ring) !== JSON.stringify(Engine.snapshotRing({ preset: main.ring.preset }))) main.name = (TEMPLATE_NAMES[main.ring.preset] || 'Ring') + ' (mijn maten)';
+    if (main.name === T('Mijn ring') || JSON.stringify(main.ring) !== JSON.stringify(Engine.snapshotRing({ preset: main.ring.preset }))) main.name = (TEMPLATE_NAMES[main.ring.preset] || 'Ring') + T(' (mijn maten)');
     (j.folders || []).forEach(function (f) { f.profileId = main.id; });
   }
   var ids = {}; j.profiles.forEach(function (x) { ids[x.id] = 1; });
@@ -1882,7 +2428,7 @@ function saveFile(name, data, mime) {
 function slug(s) { return String(s || 'ringlabels').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().replace(/[^\w\-]+/g, '_').replace(/^_+|_+$/g, '') || 'ringlabels'; }
 function today() {
   var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
-  return p(d.getDate()) + '-' + p(d.getMonth() + 1) + '-' + d.getFullYear();
+  return LANG === 'en' ? d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) : p(d.getDate()) + '-' + p(d.getMonth() + 1) + '-' + d.getFullYear();
 }
 function zlib(bytes) {
   if (typeof CompressionStream === 'undefined') return Promise.resolve(bytes);
@@ -2417,7 +2963,7 @@ $('pages').addEventListener('click', function (e) {
 });
 
 // ---------- detail ----------
-function fmtMM(n) { return (Math.round(n * 10) / 10).toFixed(1).replace('.', ','); }
+function fmtMM(n) { return dec((Math.round(n * 10) / 10).toFixed(1)); }
 function addPill(box, txt, warn) { box.appendChild(el('span', 'pill' + (warn ? ' warn' : ''), txt)); }
 function textField(label, key, l, max, placeholder, onChange) {
   var lab = el('label', 'field'); lab.appendChild(el('span', '', label));
@@ -2494,7 +3040,7 @@ function calSection(l, ring, lay) {
   box.appendChild(r1); box.appendChild(r2); box.appendChild(res); box.appendChild(el('div', 'row')).appendChild(apply);
   var result = null;
   function num(v) { v = parseFloat(String(v).replace(',', '.')); return isFinite(v) ? v : null; }
-  function f2(n) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', ','); }
+  function f2(n) { return dec((Math.round(n * 100) / 100).toFixed(2)); }
   function update() {
     st.inf = inInf.value; st.read = inRead.value; st.d = sel2.value;
     var p = pts.filter(function (x) { return x.text === st.d; })[0];
@@ -2508,7 +3054,7 @@ function calSection(l, ring, lay) {
     if (span <= 5) { res.appendChild(el('span', 'warn', 'De afstand moet verder op het label liggen dan oneindig. Controleer de getallen.')); return; }
     var mmPer1000 = span / (infFv - p.fv) * 1000;
     var diff = (mmPer1000 / ring.mmPer1000 - 1) * 100;
-    var s1 = el('span'); s1.appendChild(document.createTextNode('Schaal: ')); s1.appendChild(el('b', '', f2(mmPer1000) + ' mm per 1000')); s1.appendChild(document.createTextNode(' (nu ' + f2(ring.mmPer1000) + ', ' + (diff >= 0 ? '+' : '') + diff.toFixed(1).replace('.', ',') + '%)'));
+    var s1 = el('span'); s1.appendChild(document.createTextNode('Schaal: ')); s1.appendChild(el('b', '', f2(mmPer1000) + ' mm per 1000')); s1.appendChild(document.createTextNode(' (nu ' + f2(ring.mmPer1000) + ', ' + (diff >= 0 ? '+' : '') + dec(diff.toFixed(1)) + '%)'));
     var s2 = el('span'); s2.appendChild(document.createTextNode('Nudge tot ∞-lijn: ')); s2.appendChild(el('b', '', f2(a) + ' mm')); s2.appendChild(document.createTextNode(' vanaf ' + refWord));
     res.appendChild(s1); res.appendChild(s2);
     if (mmPer1000 < 15 || mmPer1000 > 35) { res.appendChild(el('span', 'warn', 'Deze schaal is erg anders dan normaal. Controleer of je bij de juiste afstand hebt afgelezen.')); return; }
@@ -2592,7 +3138,7 @@ function renderDetail() {
   var g = ring.notch;
   var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
   var infHere = lay.inf ? lay.inf.v - ring.zeroV : ring.offsetInput;
-  cu.appendChild(el('p', 'hint', 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ∞ ligt ' + String(Math.round(infHere * 100) / 100).replace('.', ',') + ' mm onder ' + refWord + ' van de nudge.'));
+  cu.appendChild(el('p', 'hint', 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ∞ ligt ' + dec(Math.round(infHere * 100) / 100) + ' mm onder ' + refWord + ' van de nudge.'));
   if (isTiltaRing(profileOf(folderById(l.folderId)))) {
     var jl = el('a', 'btn small', 'Mal voor de Tilta ARRI-ring (STL)'); jl.href = JIG_URL; jl.target = '_blank'; jl.rel = 'noopener';
     if (window.__PWA__) jl.setAttribute('download', JIG_FILE);
@@ -2730,7 +3276,7 @@ $('saveForm').addEventListener('submit', function (e) {
   e.preventDefault();
   var f = activeFolder(); if (!f) return;
   P.saved = P.saved || [];
-  var name = $('saveName').value.trim() || ('Opmaak ' + (P.saved.length + 1));
+  var name = $('saveName').value.trim() || (T('Opmaak') + ' ' + (P.saved.length + 1));
   var ex = savedByName(name), st = Engine.normalizeStyle(clone(f.style));
   if (ex) { ex.style = st; f.styleKey = 'u:' + ex.id; f.styleBase = ex.id; toast(ex.name + ' bijgewerkt'); }
   else { var item = { id: uid('s'), name: name, style: st }; P.saved.push(item); f.styleKey = 'u:' + item.id; f.styleBase = item.id; toast('Bewaard als ' + name + '. Je vindt hem bij de startpunten onder Mijn opmaak.', { ms: 5000 }); }
@@ -2772,8 +3318,8 @@ $('btnStyleAll').onclick = function () {
   toast('Opmaak van ' + f.name + ' op alle mappen gezet', { action: { label: 'Ongedaan maken', run: function () { prev.forEach(function (p) { p.f.style = p.s; p.f.styleKey = p.k; }); changed(); } }, ms: 6000 });
 };
 $('btnNewFolder').onclick = function () {
-  var n = 1, name = 'Nieuwe map';
-  while (P.folders.some(function (f) { return f.name === name; })) name = 'Nieuwe map ' + (++n);
+  var n = 1, name = T('Nieuwe map');
+  while (P.folders.some(function (f) { return f.name === name; })) name = T('Nieuwe map') + ' ' + (++n);
   var f = newFolder(name, 'eigen-' + uid('')); P.folders.push(f); P.active = f.id; sel = null; changed();
   setTimeout(function () { $('folderName').focus(); $('folderName').select(); }, 50);
 };
@@ -2790,6 +3336,8 @@ $('btnDelFolder').onclick = function () {
 };
 $('zoom').addEventListener('input', renderPages);
 function measureBar() { document.documentElement.style.setProperty('--barH', document.querySelector('.bar').offsetHeight + 'px'); }
+// de kop kan van hoogte veranderen (lettertype geladen, knop erbij, andere taal): dan opnieuw meten
+if (window.ResizeObserver) new ResizeObserver(function () { measureBar(); }).observe(document.querySelector('.bar'));
 window.addEventListener('resize', function () { clearTimeout(window.__rz); window.__rz = setTimeout(function () { measureBar(); renderPages(); }, 120); });
 
 $('btnAdd').onclick = function () { $('fileIn').click(); };
@@ -2808,7 +3356,7 @@ $('libIn').onchange = function () {
 };
 $('btnSaveLib').onclick = function () { saveLibrary(); };
 function saveLibrary() {
-  saveFile('Focusringlabels_bibliotheek_' + today() + '.json', JSON.stringify(P, null, 1), 'application/json').then(function (ok) {
+  saveFile(T('Focusringlabels_bibliotheek_') + today() + '.json', JSON.stringify(P, null, 1), 'application/json').then(function (ok) {
     if (ok) { P.lastBackup = Date.now(); persist(); renderBackup(); }
   });
 }
@@ -2870,7 +3418,7 @@ $('profName').addEventListener('input', function () { var prof = currentProfile(
 $('profName').addEventListener('blur', function () { $('profName').value = currentProfile().name; });
 $('btnProfCopy').onclick = function () {
   var src = currentProfile();
-  addProfile({ id: uid('p'), name: uniqueProfileName(src.name + ' (kopie)'), ring: clone(src.ring) });
+  addProfile({ id: uid('p'), name: uniqueProfileName(src.name + T(' (kopie)')), ring: clone(src.ring) });
 };
 $('btnProfDel').onclick = function () {
   if (P.profiles.length <= 1) return;
@@ -2925,7 +3473,7 @@ function exportPDF(all, btn) {
   var fs = strippedFolders(all); if (needLenses(fs)) return;
   busy(btn, true);
   var pages = []; fs.forEach(function (f) { pages = pages.concat(pagesFor(f)); });
-  var name = all ? 'Alle_mappen' : slug(fs[0].name);
+  var name = all ? T('Alle_mappen') : slug(fs[0].name);
   Engine.buildPDF(pages, all ? 'Ringlabels' : fs[0].name, zlib, ICC).then(function (bytes) {
     return saveFile(name + '_ringlabels.pdf', new Blob([bytes], { type: 'application/pdf' }), 'application/pdf');
   }).catch(function (e) { toast('PDF maken mislukt: ' + (e && e.message || e), { err: true }); })
@@ -2934,8 +3482,8 @@ function exportPDF(all, btn) {
 $('btnCalib').onclick = function () {
   var btn = $('btnCalib'); busy(btn, true);
   var rs = ringRs(currentProfile()), pages = Engine.buildCalibPages(rs, { date: today() }), r = Engine.ringFor(rs);
-  Engine.buildPDF(pages, 'Meetlabel nudge', zlib, ICC).then(function (bytes) {
-    return saveFile('Meetlabel_nudge_' + String(r.length).replace('.', ',') + 'mm.pdf', new Blob([bytes], { type: 'application/pdf' }), 'application/pdf');
+  Engine.buildPDF(pages, T('Meetlabel nudge'), zlib, ICC).then(function (bytes) {
+    return saveFile(T('Meetlabel_nudge_') + dec(r.length) + 'mm.pdf', new Blob([bytes], { type: 'application/pdf' }), 'application/pdf');
   }).catch(function (e) { toast('Meetlabel maken mislukt: ' + (e && e.message || e), { err: true }); })
     .then(function () { busy(btn, false); });
 };
@@ -2944,7 +3492,7 @@ $('btnSvg').onclick = function () {
   var pg = pagesFor(fs[0]), i = 0;
   (function next() {
     if (i >= pg.length) return;
-    var name = slug(fs[0].name) + '_ringlabels' + (pg.length > 1 ? '_vel' + (i + 1) : '') + '.svg';
+    var name = slug(fs[0].name) + '_ringlabels' + (pg.length > 1 ? T('_vel') + (i + 1) : '') + '.svg';
     var svg = '<?xml version="1.0" encoding="UTF-8"?>\n' + Engine.pageSVG(pg[i], { idPrefix: 's' + i });
     i++;
     saveFile(name, svg, 'image/svg+xml').then(next);
@@ -2991,7 +3539,7 @@ function renderPNG(page, dpi) {
         c.toBlob(function (b) { if (!b) return rej(new Error('het vel is te groot voor deze browser; kies een lagere resolutie')); b.arrayBuffer().then(function (ab) { res(tagPNG(ab, dpi)); }); }, 'image/png');
       } catch (e) { rej(e); }
     };
-    img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('tekenen mislukt')); };
+    img.onerror = function () { URL.revokeObjectURL(url); rej(new Error(T('tekenen mislukt'))); };
     img.src = url;
   });
 }
@@ -3001,7 +3549,7 @@ $('btnPng').onclick = function () {
   busy(btn, true); toast('PNG op ' + dpi + ' dpi maken…', { sticky: true });
   (function next() {
     if (i >= pg.length) { busy(btn, false); return; }
-    var name = slug(fs[0].name) + '_ringlabels_' + dpi + 'dpi' + (pg.length > 1 ? '_vel' + (i + 1) : '') + '.png';
+    var name = slug(fs[0].name) + '_ringlabels_' + dpi + 'dpi' + (pg.length > 1 ? T('_vel') + (i + 1) : '') + '.png';
     renderPNG(pg[i++], dpi).then(function (bytes) { return saveFile(name, new Blob([bytes], { type: 'image/png' }), 'image/png'); })
       .then(next, function (e) { busy(btn, false); toast('PNG maken mislukt: ' + (e && e.message || e), { err: true }); });
   })();
@@ -3093,7 +3641,7 @@ document.addEventListener('keydown', function (e) {
 // De app werkt in zijn eigen opslag; het gekoppelde bestand krijgt na elke wijziging een kopie.
 var LF = { ok: !inViewer && typeof window.showSaveFilePicker === 'function' && window.self === window.top,
   handle: null, perm: 'none', name: '', savedAt: 0, sig: '', t: null, busy: false, again: false };
-var LIB_TYPES = [{ description: 'Focusringlabels-bibliotheek', accept: { 'application/json': ['.json'] } }];
+var LIB_TYPES = [{ description: T('Focusringlabels-bibliotheek'), accept: { 'application/json': ['.json'] } }];
 function idb(mode, fn) {
   return new Promise(function (res, rej) {
     var rq = indexedDB.open('focusringlabels', 1);
@@ -3160,7 +3708,7 @@ function renderLibFile() {
   } else t.textContent = 'Wordt automatisch bewaard in ' + LF.name + (LF.savedAt ? ' · laatst om ' + hhmm(LF.savedAt) : '') + '. Alles wat in de app staat, komt in dat bestand.';
 }
 $('btnLinkFile').onclick = function () {
-  window.showSaveFilePicker({ suggestedName: 'Focusringlabels bibliotheek.json', id: 'frl-bibliotheek', types: LIB_TYPES }).then(function (h) {
+  window.showSaveFilePicker({ suggestedName: T('Focusringlabels bibliotheek.json'), id: 'frl-bibliotheek', types: LIB_TYPES }).then(function (h) {
     lfLink(h); return lfWrite(true);
   }, function (e) { if (e && e.name !== 'AbortError') toast('Koppelen lukte niet: ' + e.message, { err: true }); });
 };
@@ -3233,7 +3781,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '27 · 13-10-2026 · eigen opmaak bewaren';
+var APP_VERSION = '28 · ' + (LANG === 'en' ? '2026-10-13 · Dutch and English' : '13-10-2026 · Nederlands en Engels');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
