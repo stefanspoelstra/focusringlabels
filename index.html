@@ -259,6 +259,18 @@ details[open] summary { margin-bottom: 10px; }
 .sheet svg { display: block; width: 100%; height: auto; }
 .sheet [data-lens] { cursor: pointer; }
 .emptysheet { color: var(--mat-ink); max-width: 420px; text-align: center; padding: 40px 10px; }
+.start { background: var(--surface); color: var(--ink); border-radius: 10px; padding: 26px 26px 22px; margin: 36px auto; max-width: 480px; width: 100%;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.12), 0 12px 30px rgba(0,0,0,0.28); display: flex; flex-direction: column; gap: 14px; }
+.start h2 { margin: 0; font: 700 24px/1.1 var(--font-cond); }
+.start p { margin: 0; line-height: 1.45; }
+.start .row { flex-wrap: wrap; }
+.start .steps { margin: 4px 0 0; padding: 0; list-style: none; counter-reset: st; display: flex; flex-direction: column; gap: 8px; }
+.start .steps li { counter-increment: st; display: grid; grid-template-columns: 22px 1fr; gap: 0 10px; align-items: start; line-height: 1.45; }
+.start .steps li::before { content: counter(st); font: 700 13px/1 var(--font-cond); width: 20px; height: 20px; border-radius: 50%; margin-top: 1px;
+  border: 1.5px solid var(--ink); display: inline-flex; align-items: center; justify-content: center; }
+.start .steps b { white-space: nowrap; }
+.start .steps b::after { content: " –"; font-weight: 400; color: var(--muted); }
+body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 
 .lenshead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .lenshead .big { font: 700 40px/0.9 var(--font-cond); font-variant-numeric: tabular-nums; }
@@ -1786,6 +1798,18 @@ var I18N = (function () {
     'aan': 'on',
     'Lijn om het hele label': 'Line around the whole label',
     'Afgeronde hoeken': 'Rounded corners',
+    'Mijn lenzen': 'My lenses',
+    'Voorbeeld': 'Example',
+    'Weghalen': 'Remove',
+    'Begin met je lenzen': 'Start with your lenses',
+    'Sleep je .tl-bestanden hierheen, of kies ze hieronder. Elke lens wordt één strook; lenzen van hetzelfde merk komen samen in een map.': 'Drag your .tl files here, or choose them below. Each lens becomes one strip; lenses of the same brand go into one folder.',
+    'Ring kiezen': 'Choose the ring',
+    'de .tl-bestanden van je lenzen.': 'the .tl files of your lenses.',
+    'bij Ring staat de Tilta ARRI-ring al klaar. Gebruik je de ARRI WCU-4, kies dan dat profiel.': 'the Tilta ARRI ring is already set up under Ring. Using the ARRI WCU-4? Choose that profile.',
+    'op 100%, daarna snijden langs de lijn.': 'at 100%, then cut along the line.',
+    'Nog geen .tl-bestanden bij de hand?': 'No .tl files at hand?',
+    'Voorbeeld bekijken': 'View an example',
+    'Voorbeeld 50 mm geladen. Dit is een verzonnen lens om de app te bekijken.': 'Example 50 mm loaded. This is a made-up lens to try out the app.',
     'Profiel': 'Profile',
     'Een profiel bevat de ring en het label. Alles op dit tabblad geldt voor elke map met dit profiel.': 'A profile holds the ring and the label. Everything on this tab applies to every folder with this profile.',
     'Label': 'Label',
@@ -2293,7 +2317,7 @@ function newFolder(name, key, presetKey) {
   var pid = defaultProfileId();
   if (!presetKey && P && P.defaults && P.defaults.style)
     return { id: uid('f'), key: key || Engine.brandKey(name), name: name, styleKey: 'mijn', style: Engine.normalizeStyle(clone(P.defaults.style)), open: true, profileId: pid };
-  presetKey = presetKey || PRESET_CYCLE[(P ? P.folders.length : 0) % PRESET_CYCLE.length];
+  presetKey = presetKey || PRESET_CYCLE[(P ? P.folders.filter(function (x) { return !x.starter; }).length : 0) % PRESET_CYCLE.length];
   return { id: uid('f'), key: key || Engine.brandKey(name), name: name, styleKey: presetKey, style: Engine.normalizeStyle(clone(Engine.STYLES[presetKey])), open: true, profileId: pid };
 }
 // ---------- ringprofielen: elk profiel bevat alle maten, zonder verborgen lagen ----------
@@ -2389,9 +2413,9 @@ function renderDefaults() {
 function defaults() {
   P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 31, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
-  var lens = Engine.parseLensFile(JSON.stringify(SAMPLE_TL), 'DULENS PL 85.tl');
-  fileLens(lens);
-  P.active = P.folders[0].id;
+  // geen voorbeeldlens meer: één lege startmap, die het eerste merk overneemt (met opmaak en profiel die je al koos)
+  var f = newFolder(T('Mijn lenzen')); f.starter = true; P.folders.push(f);
+  P.active = f.id;
   return P;
 }
 function migrate(j) {
@@ -2463,8 +2487,29 @@ function activeFolder() { return folderById(P.active) || P.folders[0]; }
 function folderForBrand(name) {
   var key = Engine.brandKey(name);
   var f = P.folders.filter(function (x) { return x.key === key; })[0];
-  if (!f) { f = newFolder(name, key); P.folders.push(f); }
+  if (!f) {
+    var st = P.folders.filter(function (x) { return x.starter && !lensesOf(x.id).length; })[0];
+    if (st) { st.name = name; st.key = key; delete st.starter; f = st; }
+    else { f = newFolder(name, key); P.folders.push(f); }
+  }
   return f;
+}
+// voorbeeld: een verzonnen lens om de app te bekijken zonder eigen .tl-bestanden (tabel van een echte prime)
+function loadExample() {
+  var j = clone(SAMPLE_TL), name = T('Voorbeeld');
+  j.brand = name; j.series = ''; j.focal_length = '50';
+  for (var i = 0; i < j.focus.length; i++) if (String(j.focus[i]).trim().toUpperCase() === 'INF') j.fv[i] = 9985;
+  var l = Engine.parseLensFile(JSON.stringify(j), name + ' 50.tl');
+  l.brandName = name;
+  var f = fileLens(l); f.open = true; P.active = f.id; sel = l.id; changed();
+  toast('Voorbeeld 50 mm geladen. Dit is een verzonnen lens om de app te bekijken.', { action: { label: 'Weghalen', run: function () {
+    P.lenses = P.lenses.filter(function (x) { return x !== l; });
+    if (!lensesOf(f.id).length) {
+      if (P.folders.length === 1) { f.name = T('Mijn lenzen'); f.key = Engine.brandKey(f.name); f.starter = true; }
+      else { P.folders = P.folders.filter(function (x) { return x !== f; }); P.active = P.folders[0].id; }
+    }
+    sel = null; changed();
+  } }, ms: 9000 });
 }
 function focalNum(l) { var n = parseFloat(String(l.focal).replace(',', '.')); return isFinite(n) ? n : 1e9; }
 // zet lens in de map van zijn merk, op volgorde van brandpuntsafstand
@@ -2645,7 +2690,7 @@ function renderFolders() {
     li.appendChild(head);
     if (f.open) {
       var ol = el('ol', 'lenslist');
-      if (!ls.length) ol.appendChild(el('li', 'none', 'Lege map. Verplaats een lens hierheen via het paneel rechts.'));
+      if (!ls.length && !f.starter) ol.appendChild(el('li', 'none', 'Lege map. Verplaats een lens hierheen via het paneel rechts.'));
       ls.forEach(function (l, i) {
         var row = el('li', 'lens' + (l.id === sel ? ' sel' : '') + (l.include === false ? ' off' : ''));
         row.tabIndex = 0;
@@ -3053,11 +3098,35 @@ $('anchorWarn').addEventListener('click', function () {
   showTab('ring');
   var a = $('anchorSel'); if (a) { a.scrollIntoView({ block: 'center' }); a.focus(); }
 });
+// startscherm zolang er nog geen lenzen zijn
+function startCard() {
+  var c = el('div', 'start');
+  c.appendChild(el('h2', '', 'Begin met je lenzen'));
+  c.appendChild(el('p', '', 'Sleep je .tl-bestanden hierheen, of kies ze hieronder. Elke lens wordt één strook; lenzen van hetzelfde merk komen samen in een map.'));
+  var row = el('div', 'row');
+  // bibliotheek openen: waar het kan meteen gekoppeld, zodat hij daarna vanzelf in dat bestand wordt bewaard
+  [['Lenzen laden', 'btnAdd', true], ['Map laden', 'btnDir'], ['Bibliotheek openen', LF.ok ? 'btnOpenLink' : 'btnOpenLib']].forEach(function (b) {
+    var x = el('button', 'btn' + (b[2] ? ' primary' : ''), b[0]); x.type = 'button'; x.onclick = function () { $(b[1]).click(); }; row.appendChild(x);
+  });
+  c.appendChild(row);
+  var ol = el('ol', 'steps');
+  [['Lenzen laden', 'de .tl-bestanden van je lenzen.'],
+   ['Ring kiezen', 'bij Ring staat de Tilta ARRI-ring al klaar. Gebruik je de ARRI WCU-4, kies dan dat profiel.'],
+   ['Printen', 'op 100%, daarna snijden langs de lijn.']].forEach(function (s) {
+    var li = el('li'), d = el('div'); d.appendChild(el('b', '', s[0])); d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', '', s[1])); li.appendChild(d); ol.appendChild(li);
+  });
+  c.appendChild(ol);
+  var ex = el('p', 'hint'); ex.appendChild(el('span', '', 'Nog geen .tl-bestanden bij de hand? '));
+  var eb = el('button', 'linkbtn', 'Voorbeeld bekijken'); eb.type = 'button'; eb.id = 'btnExample'; eb.onclick = loadExample; ex.appendChild(eb);
+  c.appendChild(ex);
+  return c;
+}
 function renderPages() {
   var box = $('pages'), sc = box.parentNode, keepT = sc.scrollTop, keepL = sc.scrollLeft;
   box.textContent = '';
   var f = activeFolder();
   if (!f) { box.appendChild(el('p', 'emptysheet', 'Laad lensbestanden om te beginnen.')); $('pageInfo').textContent = ''; $('anchorWarn').hidden = true; return; }
+  if (!P.lenses.length) { $('anchorWarn').hidden = true; $('pageInfo').textContent = ''; box.appendChild(startCard()); return; }
   var total = lensesOf(f.id).filter(function (l) { return l.include !== false; }).length;
   if (!total) {
     $('anchorWarn').hidden = true;
@@ -3244,7 +3313,7 @@ function renderDetail() {
   var root = $('detail'); root.textContent = '';
   var l = sel && lensById(sel), f = activeFolder();
   if (!l) {
-    root.appendChild(el('p', 'empty', f ? 'Kies een lens in ' + f.name + ' om de strook te bekijken.' : 'Laad een of meer .tl-bestanden om stroken te maken. Elk bestand wordt één strook.'));
+    root.appendChild(el('p', 'empty', f && P.lenses.length ? 'Kies een lens in ' + f.name + ' om de strook te bekijken.' : 'Laad een of meer .tl-bestanden om stroken te maken. Elk bestand wordt één strook.'));
     return;
   }
   var ring = ringOf(folderById(l.folderId) || activeFolder()), lay = Engine.layoutLens(l, ring);
@@ -3419,7 +3488,7 @@ $('minors').onchange = function () { P.minors = $('minors').checked; changed(); 
 $('lensText').onchange = function () { P.lensText = $('lensText').checked; changed(); };
 $('topExtra').onchange = function () { P.topExtra = $('topExtra').checked; changed(); };
 $('pngDpi').onchange = function () { P.pngDpi = Number($('pngDpi').value); persist(); };
-$('folderName').addEventListener('input', function () { var f = activeFolder(); if (!f) return; f.name = $('folderName').value || f.name; changed(); });
+$('folderName').addEventListener('input', function () { var f = activeFolder(); if (!f) return; f.name = $('folderName').value || f.name; delete f.starter; changed(); });
 $('folderName').addEventListener('blur', function () { var f = activeFolder(); if (f) $('folderName').value = f.name; });
 $('cInk').addEventListener('input', function () { var f = activeFolder(); f.style.ink = $('cInk').value; mark(); changed(); });
 $('fullFill').addEventListener('change', function () {
@@ -3906,7 +3975,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '32 · ' + (LANG === 'en' ? '2026-10-13 · new black and white logo' : '13-10-2026 · nieuw logo in zwart-wit');
+var APP_VERSION = '33 · ' + (LANG === 'en' ? '2026-10-13 · start screen instead of a sample lens' : '13-10-2026 · startscherm in plaats van voorbeeldlens');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
@@ -3921,8 +3990,6 @@ lfInit().then(function () {
     var d = backupAge();
     if (P.lenses.length > 1 && (d === null || d > 7))
       toast(d === null ? 'Je hebt nog geen back-up van je bibliotheek.' : 'Je laatste back-up is ' + d + ' dagen oud.', { action: { label: LF.ok ? 'Bewaren in bestand' : 'Nu opslaan', run: LF.ok ? function () { $('btnLinkFile').click(); } : saveLibrary }, ms: 9000 });
-    else if (P.lenses.length <= 1 && LF.ok)
-      toast('Heb je al een bibliotheek? Open hem hier en hij wordt voortaan automatisch bewaard.', { action: { label: 'Openen', run: function () { $('btnOpenLink').click(); } }, ms: 9000 });
   }, 1200);
 });
 })();
