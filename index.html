@@ -193,6 +193,16 @@ body.dragging .drop { outline: 2px dashed var(--accent); outline-offset: -2px; b
 .lens .f { font: 700 20px/1 var(--font-cond); font-variant-numeric: tabular-nums; min-width: 2.4ch; }
 .lens .meta { min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lens .tools { display: flex; }
+.lens { grid-template-columns: auto auto minmax(0, 1fr) auto; padding-left: 2px; }
+.grip { color: var(--muted); opacity: 0.45; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+  font-size: 15px; line-height: 1; padding: 6px 2px; }
+.lens:hover .grip, .lens.sel .grip { opacity: 0.9; }
+body.lensdrag, body.lensdrag * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.lens.dragging { opacity: 0.4; }
+.lens.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.lens.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.folder > .fhead.drop-into { outline: 2px dashed var(--accent); outline-offset: -2px; }
+.pages.side { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
 .lens.off .f, .lens.off .meta { opacity: 0.45; text-decoration: line-through; }
 .lenslist .none { color: var(--muted); font-size: 13px; padding: 4px 8px; }
 
@@ -1485,7 +1495,7 @@ var Engine = (function () {
       [400, 2.2, '1. Cut out a strip along the line.'],
       [400, 2.2, '2. Stick it on the ring, with the cutout around the nudge.'],
       [400, 2.2, '3. Turn the lens to infinity (\u221e).'],
-      [400, 2.2, '4. Read the scale at the index mark of the WCU-4.'],
+      [400, 2.2, '4. Read the scale at the index mark of your hand unit.'],
       [400, 2.2, '5. Enter that number at "Nudge to \u221e line".'],
       [400, 0, ''],
       [400, 1.9, '0 is ' + refTxt.split(' (')[0] + '.'],
@@ -1502,7 +1512,7 @@ var Engine = (function () {
       [400, 2.2, '1. Knip een strook uit langs de lijn.'],
       [400, 2.2, '2. Plak hem op de ring, met de uitsparing om de nudge.'],
       [400, 2.2, '3. Draai de lens naar oneindig (\u221e).'],
-      [400, 2.2, '4. Lees de schaal af bij de index van de WCU-4.'],
+      [400, 2.2, '4. Lees de schaal af bij het indexstreepje van je handunit.'],
       [400, 2.2, '5. Vul dat getal in bij "Nudge tot \u221e-lijn".'],
       [400, 0, ''],
       [400, 1.9, '0 is ' + refTxt.split(' (')[0] + '.'],
@@ -1865,6 +1875,9 @@ var I18N = (function () {
     'Inzoomen': 'Zoom in',
     'Klik op een strook om hem te kiezen': 'Click a strip to select it',
     'Terug naar passend': 'Back to fit',
+    'Slepen om te verplaatsen': 'Drag to move',
+    'Lege map. Sleep een lens hierheen, of kies een andere map bij de lensinstellingen.': 'Empty folder. Drag a lens here, or choose another folder in the lens settings.',
+    'Gekozen lens verplaatsen': 'Move the selected lens',
     'Voorbeeld 50 mm geladen. Dit is een verzonnen lens om de app te bekijken.': 'Example 50 mm loaded. This is a made-up lens to try out the app.',
     'Profiel': 'Profile',
     'Een profiel bevat de ring en het label. Alles op dit tabblad geldt voor elke map met dit profiel.': 'A profile holds the ring and the label. Everything on this tab applies to every folder with this profile.',
@@ -2746,7 +2759,7 @@ function renderFolders() {
   P.folders.forEach(function (f) {
     var ls = lensesOf(f.id);
     var li = el('li', 'folder' + (f.id === P.active ? ' active' : '') + (f.open ? ' open' : ''));
-    var head = el('div', 'fhead'); head.tabIndex = 0; head.setAttribute('role', 'button');
+    var head = el('div', 'fhead'); head.tabIndex = 0; head.setAttribute('role', 'button'); head.setAttribute('data-folder', f.id);
     head.setAttribute('aria-expanded', f.open ? 'true' : 'false');
     var caret = el('span', 'caret', '▶'); caret.setAttribute('aria-hidden', 'true');
     head.appendChild(caret); head.appendChild(chipFor(f.style));
@@ -2762,10 +2775,14 @@ function renderFolders() {
     li.appendChild(head);
     if (f.open) {
       var ol = el('ol', 'lenslist');
-      if (!ls.length && !f.starter) ol.appendChild(el('li', 'none', 'Lege map. Verplaats een lens hierheen via het paneel rechts.'));
+      if (!ls.length && !f.starter) ol.appendChild(el('li', 'none', 'Lege map. Sleep een lens hierheen, of kies een andere map bij de lensinstellingen.'));
       ls.forEach(function (l, i) {
         var row = el('li', 'lens' + (l.id === sel ? ' sel' : '') + (l.include === false ? ' off' : ''));
-        row.tabIndex = 0;
+        row.tabIndex = 0; row.setAttribute('data-id', l.id);
+        var grip = el('span', 'grip', '⠿'); grip.title = 'Slepen om te verplaatsen'; grip.setAttribute('aria-hidden', 'true');
+        grip.addEventListener('pointerdown', function (e) { dragStart(e, l, row); });
+        row.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse' && !e.target.closest('button, .grip')) dragStart(e, l, row); });
+        row.appendChild(grip);
         row.appendChild(el('span', 'f', l.focal || l.topText || '?'));
         row.appendChild(el('span', 'meta', [l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : '', l.unit === 'ft' ? 'ft' : ''].filter(Boolean).join(' · ')));
         var tools = el('span', 'tools');
@@ -2775,13 +2792,15 @@ function renderFolders() {
           x.onclick = function (e) { e.stopPropagation(); fn(); };
           tools.appendChild(x);
         }
-        tb('↑', 'Naar voren', function () { moveLens(l, -1); }, i === 0);
-        tb('↓', 'Naar achteren', function () { moveLens(l, 1); }, i === ls.length - 1);
         tb(l.include === false ? '○' : '●', l.include === false ? 'Weer op het vel zetten' : 'Niet op het vel zetten', function () { l.include = l.include === false; changed(); });
         tb('×', 'Verwijderen', function () { removeLens(l); });
         row.appendChild(tools);
-        row.onclick = function () { sel = l.id; P.active = f.id; changed(); };
-        row.onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = l.id; P.active = f.id; changed(); } };
+        row.onclick = function () { if (DRAG_JUST) return; sel = l.id; P.active = f.id; changed(); };
+        row.onkeydown = function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = l.id; P.active = f.id; changed(); }
+          // ⌥/Alt + pijltje: lens verplaatsen met het toetsenbord
+          else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); moveLens(l, e.key === 'ArrowUp' ? -1 : 1); refocusLens(l.id); }
+        };
         ol.appendChild(row);
       });
       li.appendChild(ol);
@@ -2794,6 +2813,73 @@ function moveLens(l, d) {
   var i = same.indexOf(l), j = i + d; if (j < 0 || j >= same.length) return;
   var a = P.lenses.indexOf(l), b = P.lenses.indexOf(same[j]);
   P.lenses[a] = same[j]; P.lenses[b] = l; changed();
+}
+function refocusLens(id) { requestAnimationFrame(function () { requestAnimationFrame(function () { var r = document.querySelector('#folders li.lens[data-id="' + id + '"]'); if (r) r.focus(); }); }); }
+// ---------- slepen: volgorde van de lenzen, of naar een andere map ----------
+var DRAG = null, DRAG_JUST = false;
+function dragStart(e, l, row) {
+  if (e.button) return;
+  DRAG = { l: l, row: row, x: e.clientX, y: e.clientY, on: false, target: null };
+  document.addEventListener('pointermove', dragMove, { passive: false });
+  document.addEventListener('pointerup', dragEnd);
+  document.addEventListener('pointercancel', dragStop);
+}
+function dragMarks() { Array.prototype.forEach.call(document.querySelectorAll('.drop-before, .drop-after, .drop-into'), function (x) { x.classList.remove('drop-before', 'drop-after', 'drop-into'); }); }
+function dragStop() {
+  document.removeEventListener('pointermove', dragMove); document.removeEventListener('pointerup', dragEnd); document.removeEventListener('pointercancel', dragStop);
+  dragMarks(); document.body.classList.remove('lensdrag');
+  if (DRAG && DRAG.row) DRAG.row.classList.remove('dragging');
+  clearInterval(dragScrollT); dragScrollT = null;
+}
+var dragScrollT = null, dragScrollV = 0;
+function dragScroller() {   // bij de rand van het paneel (of het scherm) vanzelf meescrollen
+  var p = document.querySelector('.panel'), own = p.scrollHeight > p.clientHeight + 2 && getComputedStyle(p).overflowY === 'auto';
+  if (own) p.scrollTop += dragScrollV; else window.scrollBy(0, dragScrollV);
+}
+function dragMove(e) {
+  var d = DRAG; if (!d) return;
+  if (!d.on) {
+    if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) < 6) return;
+    d.on = true; d.row.classList.add('dragging'); document.body.classList.add('lensdrag');
+  }
+  e.preventDefault();
+  dragMarks(); d.target = null;
+  var t = document.elementFromPoint(e.clientX, e.clientY);
+  var r = t && t.closest && t.closest('#folders li.lens[data-id]'), h = t && t.closest && t.closest('#folders .fhead[data-folder]');
+  if (r && r.getAttribute('data-id') !== d.l.id) {
+    var b = r.getBoundingClientRect(), after = e.clientY > b.top + b.height / 2;
+    r.classList.add(after ? 'drop-after' : 'drop-before'); d.target = { lens: r.getAttribute('data-id'), after: after };
+  } else if (h && h.getAttribute('data-folder') !== d.l.folderId) {
+    h.classList.add('drop-into'); d.target = { folder: h.getAttribute('data-folder') };
+  }
+  var p = document.querySelector('.panel'), own = p.scrollHeight > p.clientHeight + 2 && getComputedStyle(p).overflowY === 'auto';
+  var top = own ? p.getBoundingClientRect().top + 50 : 60, bot = own ? p.getBoundingClientRect().bottom : window.innerHeight;
+  dragScrollV = e.clientY < top + 40 ? -10 : e.clientY > bot - 40 ? 10 : 0;
+  if (dragScrollV && !dragScrollT) dragScrollT = setInterval(dragScroller, 16);
+  if (!dragScrollV && dragScrollT) { clearInterval(dragScrollT); dragScrollT = null; }
+}
+function dragEnd() {
+  var d = DRAG; dragStop(); DRAG = null;
+  if (!d || !d.on) return;
+  DRAG_JUST = true; setTimeout(function () { DRAG_JUST = false; }, 80);
+  if (!d.target) return;
+  var l = d.l, from = l.folderId, to, i = P.lenses.indexOf(l);
+  P.lenses.splice(i, 1);
+  if (d.target.lens) {
+    var o = lensById(d.target.lens); to = o.folderId;
+    P.lenses.splice(P.lenses.indexOf(o) + (d.target.after ? 1 : 0), 0, l);
+  } else {
+    to = d.target.folder;
+    var last = -1; P.lenses.forEach(function (x, k) { if (x.folderId === to) last = k; });
+    P.lenses.splice(last < 0 ? P.lenses.length : last + 1, 0, l);
+  }
+  l.folderId = to;
+  var tf = folderById(to);
+  if (to !== from) {
+    tf.open = true; delete tf.starter;
+    toast(l.focal + ' mm verplaatst naar ' + tf.name, { action: { label: 'Ongedaan maken', run: function () { histGo(-1); } }, ms: 6000 });
+  }
+  changed();
 }
 function removeLens(l) {
   var i = P.lenses.indexOf(l); P.lenses.splice(i, 1);
@@ -3268,6 +3354,10 @@ function renderPages() {
   var hint = el('span', 'stagehint', 'Klik op een strook om hem te kiezen'); $('pageInfo').appendChild(hint);
   var availW = sc.clientWidth - 12, sticky = window.innerWidth > 760;
   var base = sticky ? Math.min(availW, (sc.clientHeight - 12) * 210 / 297) : Math.min(availW, 640);
+  // meer dan één vel en genoeg breedte: twee naast elkaar, zodat je ze in één oogopslag ziet
+  var side = sticky && pg.length > 1 && (availW - 28) / 2 >= base * 0.6;
+  if (side) base = Math.min(base, (availW - 28) / 2);
+  box.classList.toggle('side', side);
   base = Math.max(base, 220); sheetBase = base;
   var hl = getComputedStyle(document.documentElement).getPropertyValue('--sel').trim() || '#ff5a36';
   pg.forEach(function (p, i) {
@@ -3966,7 +4056,7 @@ var MOD = isMac ? '⌘' : 'Ctrl+', SHIFT = isMac ? '⇧' : 'Shift+';
 $('btnUndo').title = 'Ongedaan maken (' + MOD + 'Z)';
 $('btnRedo').title = 'Opnieuw (' + SHIFT + MOD + 'Z)';
 [[MOD + 'Z', 'Ongedaan maken'], [SHIFT + MOD + 'Z', 'Opnieuw'], [MOD + 'O', 'Lenzen laden'], [MOD + 'E', 'PDF downloaden'],
- [MOD + 'P', 'Printen'], [MOD + 'S', 'Bibliotheek bewaren'], [MOD + '1 – 4', 'Tabbladen']].forEach(function (k) {
+ [MOD + 'P', 'Printen'], [MOD + 'S', 'Bibliotheek bewaren'], [MOD + '1 – 4', 'Tabbladen'], [(isMac ? '⌥' : 'Alt+') + '↑ / ↓', 'Gekozen lens verplaatsen']].forEach(function (k) {
   if (inViewer && (k[1] === 'Printen')) return;
   $('keyList').appendChild(el('dt', '', k[0])); $('keyList').appendChild(el('dd', '', k[1]));
 });
@@ -4128,7 +4218,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '36 · ' + (LANG === 'en' ? '2026-10-14 · smoother on the MacBook' : '14-10-2026 · prettiger op de MacBook');
+var APP_VERSION = '37 · ' + (LANG === 'en' ? '2026-10-14 · drag lenses, sheets side by side' : '14-10-2026 · lenzen slepen, vellen naast elkaar');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
