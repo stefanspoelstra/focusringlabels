@@ -29,7 +29,7 @@
   --raised: #ffffff;
   --ink: #16201c;
   --muted: #56645e;
-  --line: #cbd4ce;
+  --line: #d9e0db;
   --accent: #0a6d67;
   --accent-ink: #ffffff;
   --accent-soft: #d3e9e5;
@@ -64,7 +64,7 @@
 [hidden] { display: none !important; }
 html { height: 100%; }
 body { min-height: 100%; }
-body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font-ui); margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--font-ui); margin: 0; }
 button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
@@ -75,18 +75,19 @@ button, input, select { font: inherit; color: inherit; }
 }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand h1 { margin: 0; font: 700 22px/1 var(--font-cond); letter-spacing: 0.01em; }
-.brand .sub { font: 500 13px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.brand .sub { font: 500 14px/1.15 var(--font-cond); letter-spacing: 0.01em; color: var(--muted); margin-top: 2px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
 .btn {
+  white-space: nowrap;
   display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
   border: 1px solid var(--line); background: var(--raised); color: var(--ink);
-  padding: 7px 12px; border-radius: var(--r); font-weight: 500; line-height: 1.2;
+  padding: 6px 12px; border-radius: var(--r); font-weight: 500; line-height: 1.25;
 }
 .btn:hover { border-color: var(--muted); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.primary:hover { filter: brightness(1.08); }
-.btn.small { padding: 4px 8px; font-size: 13px; }
+.btn.small { padding: 5px 10px; font-size: 13px; }
 .btn.danger { color: var(--warn); }
 .btn:disabled { opacity: 0.5; cursor: default; }
 .iconbtn { border: 0; background: none; cursor: pointer; padding: 4px 6px; border-radius: 4px; color: var(--muted); font-size: 16px; line-height: 1; }
@@ -102,34 +103,51 @@ a.btn { text-decoration: none; }
 .keys dd { margin: 0; line-height: 1.5; }
 .iconbtn:disabled { opacity: 0.3; cursor: default; background: none; }
 
-.layout { display: grid; grid-template-columns: 320px minmax(0, 1fr) 340px; min-height: calc(100% - 60px); }
-.panel, .detail { background: var(--surface); padding: 16px; display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.layout { display: grid; grid-template-columns: 312px minmax(0, 1fr) 328px; min-height: calc(100% - 60px); }
+.panel, .detail { background: var(--surface); padding: 0 16px 28px; display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.detail { padding-top: 4px; }
+/* secties: rustig onder elkaar, gescheiden door een dunne lijn */
+.pane > *, .detail > * { margin: 0; padding: 16px 0; border-top: 1px solid var(--line); }
+.pane > :first-child, .detail > :first-child { border-top: 0; }
+.pane > details.more, .detail > details.more { padding: 0; }
+.pane > .ver { border-top: 0; padding-top: 4px; }
+details.more > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 14px 0; cursor: pointer;
+  font: 600 16px/1.2 var(--font-cond); letter-spacing: 0.005em; color: var(--ink); }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::after { content: ""; margin-left: auto; width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted);
+  transform: translateY(-2px) rotate(45deg); transition: transform .15s; }
+details.more[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+details.more > summary:hover::after { border-color: var(--ink); }
+details.more > .body { display: flex; flex-direction: column; gap: 12px; padding: 0 0 18px; }
+.sumval { font: 500 13px/1 var(--font-ui); color: var(--muted); }
+.row.between { justify-content: space-between; flex-wrap: nowrap; }
+.inp.auto { width: auto; }
 .panel { border-right: 1px solid var(--line); }
 .detail { border-left: 1px solid var(--line); }
-h2 { margin: 0 0 10px; font: 600 13px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-h2 b { color: var(--ink); font-weight: 600; letter-spacing: 0.06em; }
-h3 { margin: 4px 0 0; font: 600 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+h2 { margin: 0 0 12px; font: 600 17px/1.15 var(--font-cond); letter-spacing: 0.005em; color: var(--ink); display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+h2 span { font: 500 13px/1 var(--font-ui); color: var(--muted); }
+h2 b { color: var(--muted); font-weight: 500; letter-spacing: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+h3 { margin: 4px 0 0; font: 600 14px/1.2 var(--font-cond); color: var(--ink); }
 
 .tabs {
   position: sticky; top: calc(var(--barH, 57px) + env(safe-area-inset-top, 0px)); z-index: 4;
-  display: flex; margin: -16px -16px 0; padding: 0 6px;
+  display: flex; margin: 0 -16px; padding: 0 8px;
   background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .tabs button {
-  flex: 1 1 auto; border: 0; background: none; cursor: pointer; padding: 13px 6px 11px; color: var(--muted);
-  font: 600 14px/1 var(--font-cond); letter-spacing: 0.03em; text-transform: uppercase;
+  flex: 1 1 auto; border: 0; background: none; cursor: pointer; padding: 14px 6px 12px; color: var(--muted);
+  font: 600 15px/1 var(--font-cond); letter-spacing: 0.01em;
   border-bottom: 2px solid transparent; white-space: nowrap;
 }
 .tabs button:hover { color: var(--ink); }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-.pane { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.pane { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 .backup { margin: 0; font-size: 13px; color: var(--muted); }
 .backup.warn { color: var(--warn); }
-.drop { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-.drop p { margin: 0; color: var(--muted); font-size: 13px; }
-body.dragging .drop { border-color: var(--accent); background: var(--accent-soft); }
+.drop { border-radius: var(--r); transition: background-color .15s; }
+body.dragging .drop { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); padding-left: 12px; padding-right: 12px; }
 
-.folders { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.folders { list-style: none; margin: 0 -8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .folder > .fhead {
   display: grid; grid-template-columns: 18px 22px minmax(0, 1fr) auto; align-items: center; gap: 6px;
   padding: 7px 8px; border-radius: var(--r); cursor: pointer; border: 1px solid transparent;
@@ -143,7 +161,7 @@ body.dragging .drop { border-color: var(--accent); background: var(--accent-soft
 .chip { position: relative; }
 .chip i { position: absolute; top: 0; bottom: 0; display: block; }
 .stripes { display: flex; flex-direction: column; gap: 6px; }
-.stripe { display: grid; grid-template-columns: 52px 1fr 1fr auto; gap: 6px; align-items: end; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
+.stripe { display: grid; grid-template-columns: 52px 1fr 1fr auto; gap: 6px; align-items: end; }
 .stripe label { display: grid; gap: 2px; font-size: 11px; color: var(--muted); }
 .stripe input[type=color] { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); padding: 2px; cursor: pointer; }
 .stripe input[type=number] { width: 100%; padding: 4px 6px; }
@@ -162,12 +180,13 @@ body.dragging .drop { border-color: var(--accent); background: var(--accent-soft
 
 .field { display: grid; gap: 4px; }
 .field > span, .flabel { font-size: 13px; color: var(--muted); }
+.field { gap: 5px; }
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .inp { width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); min-width: 0; }
 .inp.num { width: 76px; font-variant-numeric: tabular-nums; padding: 4px 6px; }
 .unit { color: var(--muted); font-size: 13px; }
-.stack { display: flex; flex-direction: column; gap: 14px; }
-.hint { font-size: 13px; color: var(--muted); margin: 0; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.hint { font-size: 12.5px; line-height: 1.45; color: var(--muted); margin: 0; }
 details summary { cursor: pointer; font-size: 13px; color: var(--muted); }
 details[open] summary { margin-bottom: 10px; }
 .check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
@@ -179,23 +198,25 @@ details[open] summary { margin-bottom: 10px; }
 .slider .numwrap { display: flex; align-items: center; gap: 4px; }
 
 .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
-.swatch { border: 1px solid var(--line); border-radius: var(--r); padding: 3px; cursor: pointer; background: var(--raised); display: flex; }
-.swatch .chip { width: 30px; height: 26px; box-shadow: none; }
-.swgroups { display: flex; flex-direction: column; gap: 8px; }
+.swatch { border: 1px solid var(--line); border-radius: var(--r); padding: 2px; cursor: pointer; background: var(--raised); display: flex; }
+.swatch:hover { border-color: var(--muted); }
+.swatch .chip { width: 28px; height: 24px; box-shadow: none; }
+.swgroups { display: flex; flex-direction: column; gap: 10px; }
 .swgroup { display: grid; grid-template-columns: 62px minmax(0, 1fr); gap: 6px; align-items: start; }
-.swgroup > span { font: 600 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding-top: 11px; }
+.swgroup > span { font: 500 13px/1 var(--font-cond); letter-spacing: 0.01em; color: var(--muted); padding-top: 9px; }
 .swatch .mine { align-self: center; padding: 0 3px 0 5px; color: var(--accent); font-size: 13px; line-height: 1; }
 .swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 
-.zones { display: flex; flex-direction: column; gap: 8px; }
-.zone { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 6px 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
-.zone .zname { font: 600 14px/1.1 var(--font-cond); letter-spacing: 0.03em; }
+.zones { display: flex; flex-direction: column; gap: 14px; }
+.zone { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 6px 8px; align-items: center; }
+.zone .zname { font: 600 14px/1.1 var(--font-cond); }
 .zone select { padding: 4px 6px; }
 .zone .cols { grid-column: 1 / -1; display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap; }
 .zone .cols.grid4 { display: grid; grid-template-columns: 1fr 1fr auto; }
 .zone label.c { display: grid; gap: 2px; font-size: 11px; color: var(--muted); text-align: center; min-width: 46px; flex: 1; }
 .zone input[type=color], .inkrow input[type=color] { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); padding: 2px; cursor: pointer; }
-.inkrow { display: grid; grid-template-columns: 82px 80px; align-items: center; gap: 8px; }
+.inkrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inkrow input[type=color] { width: 64px; flex: none; }
 .olrow { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 8px; align-items: end; }
 .olrow input[type=color] { width: 100%; height: 32px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); padding: 2px; cursor: pointer; }
 
@@ -207,8 +228,8 @@ details[open] summary { margin-bottom: 10px; }
   background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
   padding: 14px 16px 40px; min-width: 0; display: flex; flex-direction: column; gap: 12px;
 }
-.stagebar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; color: var(--mat-ink); font: 500 14px/1.2 var(--font-cond); letter-spacing: 0.05em; text-transform: uppercase; }
-.stagebar b { font-weight: 700; color: #fff; }
+.stagebar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; color: var(--mat-ink); font: 500 15px/1.2 var(--font-cond); letter-spacing: 0.01em; }
+.stagebar b { font-weight: 600; color: #fff; margin-right: 10px; }
 .stagewarn { order: 3; flex-basis: 100%; text-align: left; border: 0; border-radius: 8px; padding: 9px 12px; background: var(--warn-soft); color: var(--warn); font: 600 14px/1.35 var(--font-ui); letter-spacing: 0; text-transform: none; cursor: pointer; }
 .stagewarn:hover { filter: brightness(0.97); }
 .stagewarn u { text-underline-offset: 2px; }
@@ -222,17 +243,17 @@ details[open] summary { margin-bottom: 10px; }
 .emptysheet { color: var(--mat-ink); max-width: 420px; text-align: center; padding: 40px 10px; }
 
 .lenshead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.lenshead .big { font: 700 44px/0.9 var(--font-cond); font-variant-numeric: tabular-nums; }
+.lenshead .big { font: 700 40px/0.9 var(--font-cond); font-variant-numeric: tabular-nums; }
 .lenshead .who { color: var(--muted); font-size: 14px; }
 .stats { display: flex; flex-wrap: wrap; gap: 6px; }
-.pill { font: 500 13px/1 var(--font-cond); letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--ink); }
+.pill { font: 500 12.5px/1 var(--font-ui); padding: 5px 9px; border-radius: 99px; background: var(--accent-soft); color: var(--ink); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
-.closeup { background: #fff; border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; }
-.closeup svg { display: block; width: 100%; height: auto; }
+.closeup { background: #fff; border-radius: var(--r); border: 1px solid var(--line); overflow: hidden; display: flex; justify-content: center; }
+.closeup svg { display: block; width: 100%; height: auto; max-height: 230px; }
 .closeup + .hint { margin-top: 6px; }
 
 .marks { width: 100%; border-collapse: collapse; font-size: 14px; }
-.marks th { text-align: left; font: 600 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 0 4px 6px; border-bottom: 1px solid var(--line); }
+.marks th { text-align: left; font: 500 12.5px/1 var(--font-ui); color: var(--muted); padding: 0 4px 6px; border-bottom: 1px solid var(--line); }
 .marks td { padding: 4px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .marks td.d { font: 600 17px/1 var(--font-cond); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .marks td.v { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
@@ -249,7 +270,7 @@ details[open] summary { margin-bottom: 10px; }
 .tsrow .tsf { font: 600 16px/1 var(--font-cond); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tsrow .tsT { font: 700 15px/1 var(--font-cond); color: var(--muted); }
 .tsrow .inp.num { width: 58px; }
-.cal { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
+.cal { display: flex; flex-direction: column; gap: 10px; }
 .cal .calrow { display: grid; grid-template-columns: minmax(0, 1fr) 84px 22px; gap: 8px; align-items: center; }
 .cal .calrow select { min-width: 0; }
 .cal .res { font-size: 14px; display: grid; gap: 2px; }
@@ -274,7 +295,7 @@ details[open] summary { margin-bottom: 10px; }
   html, body { background: #fff; }
 }
 @media (max-width: 1220px) {
-  .layout { grid-template-columns: 320px minmax(0, 1fr); }
+  .layout { grid-template-columns: 312px minmax(0, 1fr); }
   .detail { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
 }
 @media (min-width: 761px) {
@@ -312,7 +333,6 @@ details[open] summary { margin-bottom: 10px; }
     </div>
     <button class="btn" id="btnInstall" type="button" hidden>Installeren als app</button>
     <button class="btn" id="btnPrint" type="button" hidden>Printen</button>
-    <button class="btn" id="btnPng" type="button">PNG</button>
     <button class="btn primary" id="btnPdf" type="button">PDF downloaden</button>
   </div>
 </header>
@@ -327,136 +347,154 @@ details[open] summary { margin-bottom: 10px; }
     </div>
 
     <div class="pane" id="pane-lib" role="tabpanel" aria-labelledby="tab-lib">
-      <section>
-        <h2>Bibliotheek <span id="libCount"></span></h2>
-        <div class="drop">
-          <div class="row">
-            <button class="btn" id="btnAdd" type="button">Lensbestanden laden</button>
-            <button class="btn" id="btnDir" type="button">Hele map laden</button>
-          </div>
-          <p>Of sleep .tl-bestanden hierheen. Elke lens komt vanzelf in de map van zijn merk.</p>
-          <input type="file" id="fileIn" accept=".tl,.json,application/json,text/plain" multiple hidden>
-          <input type="file" id="dirIn" webkitdirectory multiple hidden>
+      <section class="stack drop">
+        <h2>Lenzen <span id="libCount"></span></h2>
+        <div class="row">
+          <button class="btn" id="btnAdd" type="button">Lenzen laden</button>
+          <button class="btn" id="btnDir" type="button">Map laden</button>
         </div>
+        <p class="hint">Of sleep .tl-bestanden hierheen. Elke lens komt vanzelf in de map van zijn merk.</p>
+        <input type="file" id="fileIn" accept=".tl,.json,application/json,text/plain" multiple hidden>
+        <input type="file" id="dirIn" webkitdirectory multiple hidden>
+      </section>
+      <section>
         <ul class="folders" id="folders"></ul>
-        <div class="row" style="margin-top:8px"><button class="btn small" id="btnNewFolder" type="button">+ Nieuwe map</button></div>
+        <div class="row" style="margin-top:10px"><button class="btn small" id="btnNewFolder" type="button">+ Nieuwe map</button></div>
       </section>
       <section class="stack">
-        <h2>Gekozen map</h2>
-        <label class="field"><span>Naam van de map (komt bovenaan het vel)</span>
+        <label class="field"><span>Naam van de map, bovenaan het vel</span>
           <input class="inp" id="folderName" type="text" maxlength="40">
         </label>
         <div class="row"><button class="btn small danger" id="btnDelFolder" type="button">Map verwijderen</button></div>
+        <p class="backup" id="backupLib"></p>
       </section>
-      <p class="backup" id="backupLib"></p>
     </div>
 
     <div class="pane" id="pane-style" role="tabpanel" aria-labelledby="tab-style" hidden>
       <section class="stack" id="styleSec">
         <h2>Opmaak <b id="styleFor"></b></h2>
         <div class="field"><span id="startLabel">Startpunt</span><div class="swgroups" id="swatches"></div></div>
-        <h3>Kleurvlakken</h3>
-        <label class="check"><input type="checkbox" id="fullFill"> Eén vlak over het hele label (geen splitsing)</label>
-        <div id="geomSliders" class="stack"></div>
-        <div class="zones" id="zones"></div>
-        <h3>Sierstrepen</h3>
-        <p class="hint">Smalle strepen over de hele lengte, gemeten vanaf de linkerrand. Mooi in of naast de rand links.</p>
-        <div class="stripes" id="stripes"></div>
-        <div class="row"><button class="btn small" id="btnAddStripe" type="button">+ Streep</button></div>
-        <div class="inkrow"><span class="zname flabel">Inkt (cijfers en streepjes)</span><input type="color" id="cInk" aria-label="Inktkleur"></div>
-        <h3>Omlijning</h3>
-        <label class="check"><input type="checkbox" id="olOn"> Omlijning om het hele label</label>
-        <div id="olOpts" class="stack">
-          <div id="olSliders"></div>
-          <div class="olrow">
-            <label class="field"><span>Kleur</span><input type="color" id="olColor"></label>
-            <label class="field"><span>Plaats van de lijn</span>
-              <select class="inp" id="olPos"><option value="in">Binnen de rand</option><option value="center">Op de snijlijn</option><option value="out">Buiten de rand</option></select>
-            </label>
-          </div>
-          <p class="hint" id="olHint"></p>
-        </div>
-        <div class="row">
-          <button class="btn small" id="btnStyleDefault" type="button">Instellen als standaard</button>
-          <button class="btn small" id="btnStyleAll" type="button">Op alle mappen toepassen</button>
-        </div>
+        <div class="inkrow"><span class="flabel">Inkt voor cijfers en streepjes</span><input type="color" id="cInk" aria-label="Inktkleur"></div>
       </section>
       <section class="stack">
-        <h2>Inhoud van het label</h2>
+        <h2>Op het label</h2>
         <label class="check"><input type="checkbox" id="minors"> Tussenstreepjes</label>
-        <label class="check"><input type="checkbox" id="lensText"> Lensnaam onderaan de strook</label>
+        <label class="check"><input type="checkbox" id="lensText"> Lensnaam onderaan</label>
         <label class="check"><input type="checkbox" id="topExtra"> T-stop bovenaan</label>
+      </section>
+      <details class="more" id="dZones">
+        <summary>Kleurvlakken aanpassen</summary>
+        <div class="body">
+          <label class="check"><input type="checkbox" id="fullFill"> Eén vlak over het hele label</label>
+          <div id="geomSliders" class="stack"></div>
+          <div class="zones" id="zones"></div>
+        </div>
+      </details>
+      <details class="more" id="dStripes">
+        <summary>Sierstrepen <span class="sumval" id="stripeCount"></span></summary>
+        <div class="body">
+          <p class="hint">Gemeten vanaf de linkerrand. Het mooist in of naast de rand links.</p>
+          <div class="stripes" id="stripes"></div>
+          <div class="row"><button class="btn small" id="btnAddStripe" type="button">+ Streep</button></div>
+        </div>
+      </details>
+      <details class="more" id="dOutline">
+        <summary>Omlijning <span class="sumval" id="olState"></span></summary>
+        <div class="body">
+          <label class="check"><input type="checkbox" id="olOn"> Lijn om het hele label</label>
+          <div id="olOpts" class="stack">
+            <div id="olSliders"></div>
+            <div class="olrow">
+              <label class="field"><span>Kleur</span><input type="color" id="olColor"></label>
+              <label class="field"><span>Plaats</span>
+                <select class="inp" id="olPos"><option value="in">Binnen de rand</option><option value="center">Op de snijlijn</option><option value="out">Buiten de rand</option></select>
+              </label>
+            </div>
+            <p class="hint" id="olHint"></p>
+          </div>
+        </div>
+      </details>
+      <section>
+        <div class="row">
+          <button class="btn small" id="btnStyleDefault" type="button">Maak standaard</button>
+          <button class="btn small" id="btnStyleAll" type="button">Op alle mappen</button>
+        </div>
       </section>
     </div>
 
     <div class="pane" id="pane-ring" role="tabpanel" aria-labelledby="tab-ring" hidden>
       <section class="stack">
-        <h2>Ringprofiel <b id="ringFor"></b></h2>
-        <label class="field"><span>Profiel van deze map</span><select class="inp" id="profSel"></select></label>
+        <h2>Ring <b id="ringFor"></b></h2>
+        <label class="field"><span>Ringprofiel</span><select class="inp" id="profSel"></select></label>
         <p class="hint" id="profUsed"></p>
-        <p class="hint">Tilta ARRI-ring = een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II. Dat is een andere ring dan de originele Tilta-ring die bij de Nucleus-M II zit.</p>
-        <label class="field"><span>Naam van het profiel</span><input class="inp" id="profName" type="text" maxlength="60"></label>
-        <div class="row">
-          <button class="btn small" id="btnProfCopy" type="button">Kopie maken</button>
-          <button class="btn small danger" id="btnProfDel" type="button">Profiel verwijderen</button>
-        </div>
-        <details>
-          <summary>Nieuw profiel vanaf de originele maten</summary>
-          <div class="row" id="profTemplates"></div>
-        </details>
       </section>
       <section class="stack">
-        <h2>Nudge en ∞</h2>
-        <p class="hint">Wat je hier verandert, geldt voor elke map met dit profiel.</p>
+        <h2>∞ en schaal</h2>
         <label class="field"><span>Plek van ∞</span>
           <select class="inp" id="infMode">
-            <option value="lens">Per lens, volgens het lensbestand (Nucleus)</option>
+            <option value="lens">Per lens, volgens het lensbestand</option>
             <option value="same">Op dezelfde plek voor elke lens</option>
           </select>
         </label>
         <div class="field" id="anchorBox">
-          <label class="field"><span>Referentielens: hiervoor geldt de ∞-afstand hieronder</span>
+          <label class="field"><span>Referentielens</span>
             <select class="inp" id="anchorSel"></select>
           </label>
           <p class="hint" id="anchorHint"></p>
         </div>
-        <label class="field"><span>Meet de ∞-afstand vanaf</span>
-          <select class="inp" id="zeroRef">
-            <option value="bottom">Onderrand nudge (kant van ∞)</option>
-            <option value="top">Bovenrand nudge (kant van het getal)</option>
-            <option value="center">Midden van de nudge</option>
-          </select>
-        </label>
         <div id="ringSliders" class="stack"></div>
-        <details>
-          <summary>Geavanceerd</summary>
-          <div id="advSliders" class="stack"></div>
-        </details>
+        <p class="hint">Geldt voor elke map met dit profiel.</p>
       </section>
+      <details class="more" id="dRingSize">
+        <summary>Maten van de ring</summary>
+        <div class="body">
+          <label class="field"><span>Meet de ∞-afstand vanaf</span>
+            <select class="inp" id="zeroRef">
+              <option value="bottom">Onderrand van de nudge (kant van ∞)</option>
+              <option value="top">Bovenrand van de nudge</option>
+              <option value="center">Midden van de nudge</option>
+            </select>
+          </label>
+          <div id="advSliders" class="stack"></div>
+        </div>
+      </details>
+      <details class="more" id="dProfile">
+        <summary>Profiel beheren</summary>
+        <div class="body">
+          <label class="field"><span>Naam</span><input class="inp" id="profName" type="text" maxlength="60"></label>
+          <div class="row">
+            <button class="btn small" id="btnProfCopy" type="button">Kopie maken</button>
+            <button class="btn small danger" id="btnProfDel" type="button">Verwijderen</button>
+          </div>
+          <div class="field"><span>Nieuw profiel met de originele maten</span><div class="row" id="profTemplates"></div></div>
+          <p class="hint">Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.</p>
+        </div>
+      </details>
       <section class="stack">
         <h2>Meetlabel</h2>
-        <p class="hint">Strook met een mm-schaal vanaf het nulpunt van de nudge. Plak hem op de ring en lees af waar oneindig valt. De schaal meten doe je rechts, bij de gekozen lens.</p>
-        <div class="row"><button class="btn small" id="btnCalib" type="button">Meetlabel downloaden (PDF)</button></div>
+        <p class="hint">Een strook met een mm-schaal vanaf de nudge. Hiermee meet je waar ∞ valt.</p>
+        <div class="row"><button class="btn small" id="btnCalib" type="button">Meetlabel downloaden</button></div>
       </section>
       <section class="stack" id="jigBox" hidden>
         <h2>Mal voor de Tilta ARRI-ring</h2>
         <img class="jigimg" src="data:image/webp;base64,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" alt="De mal met een label erin: lijmkant boven, uitsparing over de nok" width="720" height="279">
-        <p class="hint">3D-printbare mal om het label recht en op de goede plek op de ring te zetten. De nok past precies in de uitsparing van 4 × 3,3 mm.</p>
-        <p class="hint">Leg het label met de lijmkant boven in de goot, met de uitsparing over de nok. Print de mal plat, zonder support, in PLA of PETG.</p>
-        <div class="row"><a class="btn small primary" id="jigLink" target="_blank" rel="noopener">Mal downloaden (STL)</a></div>
+        <p class="hint">Label met de lijmkant boven in de goot, uitsparing over de nok. Print de mal plat en zonder support.</p>
+        <div class="row"><a class="btn small" id="jigLink" target="_blank" rel="noopener">Mal downloaden (STL)</a></div>
       </section>
     </div>
 
     <div class="pane" id="pane-export" role="tabpanel" aria-labelledby="tab-export" hidden>
       <section class="stack">
-        <h2>Exporteren</h2>
-        <label class="field"><span>Resolutie van de PNG</span>
-          <select class="inp" id="pngDpi"><option value="300">300 dpi</option><option value="600">600 dpi (scherpst)</option><option value="1200">1200 dpi</option></select>
-        </label>
+        <h2>Downloaden</h2>
         <div class="row">
           <button class="btn small" id="btnPdfAll" type="button">PDF van alle mappen</button>
           <button class="btn small" id="btnSvg" type="button">SVG</button>
         </div>
+        <div class="row">
+          <button class="btn small" id="btnPng" type="button">PNG</button>
+          <select class="inp auto" id="pngDpi" aria-label="Resolutie van de PNG"><option value="300">300 dpi</option><option value="600">600 dpi</option><option value="1200">1200 dpi</option></select>
+        </div>
+        <p class="hint" id="envHint"></p>
       </section>
       <section class="stack">
         <h2>Bewaren</h2>
@@ -474,14 +512,13 @@ details[open] summary { margin-bottom: 10px; }
           <button class="btn small" id="btnOpenLib" type="button">Bibliotheek openen</button>
           <input type="file" id="libIn" accept=".json,application/json" hidden>
         </div>
-        <p class="hint">De app, de link en het losse HTML-bestand hebben elk hun eigen opslag. Verhuizen doe je met Bibliotheek opslaan en openen, of door hetzelfde bestand te koppelen.</p>
-        <p class="hint" id="envHint"></p>
+        <p class="hint">De app, de link en het losse bestand hebben elk hun eigen opslag.</p>
       </section>
-      <section class="stack">
-        <h2>Sneltoetsen</h2>
-        <dl class="keys" id="keyList"></dl>
-        <p class="hint" id="appVer"></p>
-      </section>
+      <details class="more" id="dKeys">
+        <summary>Sneltoetsen</summary>
+        <div class="body"><dl class="keys" id="keyList"></dl></div>
+      </details>
+      <p class="hint ver" id="appVer"></p>
     </div>
   </aside>
 
@@ -1581,6 +1618,22 @@ var KEY2 = 'focusringlabels.v2', KEY1 = 'focusringlabels.v1';
 var PRESET_CYCLE = ['teal-geel', 'oranje', 'blauw', 'roze', 'groen', 'paars', 'rood', 'mint', 'geel-zwart', 'olijf', 'grijs', 'zwart-wit'];
 var ZONE_NAMES = { bandL: 'Rand links', left: 'Vlak links', right: 'Vlak rechts', bandR: 'Rand rechts' };
 var $ = function (id) { return document.getElementById(id); };
+// inklapbare onderdelen: open/dicht blijft bewaard, ook na opnieuw tekenen
+var OPEN = {}; try { OPEN = JSON.parse(localStorage.getItem('focusringlabels.open') || '{}') || {}; } catch (e) { OPEN = {}; }
+function keepOpen(d) {
+  if (OPEN[d.id]) d.open = true;
+  d.addEventListener('toggle', function () { OPEN[d.id] = d.open; try { localStorage.setItem('focusringlabels.open', JSON.stringify(OPEN)); } catch (e) {} });
+}
+function moreBox(id, title, val) {
+  var d = document.createElement('details'); d.className = 'more'; d.id = id;
+  var sm = document.createElement('summary'); sm.appendChild(document.createTextNode(title));
+  if (val) { var v = document.createElement('span'); v.className = 'sumval'; v.textContent = val; sm.appendChild(v); }
+  d.appendChild(sm);
+  var body = document.createElement('div'); body.className = 'body'; d.appendChild(body);
+  keepOpen(d);
+  return { box: d, body: body };
+}
+Array.prototype.forEach.call(document.querySelectorAll('details.more[id]'), keepOpen);
 var inViewer = !!(window.claude && typeof window.claude.use === 'function');
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 function uid(p) { return p + Math.random().toString(36).slice(2, 9); }
@@ -1660,7 +1713,7 @@ function renderDefaults() {
   var d = P.defaults || {}, f = activeFolder();
   var styleIs = !!(d.style && f) && styleSig(d.style) === styleSig(f.style);
   $('btnStyleDefault').disabled = styleIs;
-  $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Instellen als standaard';
+  $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Maak standaard';
 }
 function defaults() {
   P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 17, profiles: [] };
@@ -2016,7 +2069,10 @@ function renderStyle() {
     row.appendChild(sw); box.appendChild(row);
   });
   var curName = f.styleKey === 'mijn' ? 'Mijn standaard' : (Engine.STYLES[f.styleKey] ? Engine.STYLES[f.styleKey].label : 'eigen opmaak');
-  $('startLabel').textContent = 'Startpunt · nu: ' + curName;
+  $('startLabel').textContent = 'Startpunt: ' + curName;
+  var nStr = (f.style.stripes || []).length;
+  $('stripeCount').textContent = nStr ? String(nStr) : '';
+  $('olState').textContent = f.style.outline && f.style.outline.on ? 'aan' : '';
   // geometrie
   var g = $('geomSliders');
   if (!g._built) {
@@ -2144,7 +2200,7 @@ function renderZones(f) {
       slots = [];
     }
     slots.forEach(function (sl, k) {
-      var lab = el('label', 'c'); lab.appendChild(document.createTextNode(sl[1]));
+      var lab = el('label', 'c'); if (slots.length > 1) lab.appendChild(document.createTextNode(sl[1]));
       var inp = document.createElement('input'); inp.type = 'color'; inp.id = 'zc_' + z + '_' + sl[0]; inp.value = p.c[sl[0]];
       inp.setAttribute('aria-label', ZONE_NAMES[z] + ' ' + sl[1].toLowerCase());
       inp.addEventListener('input', function () {
@@ -2210,8 +2266,12 @@ function buildRingSliders() {
   function s(id, label, hint, min, max, step) {
     return sliderField({ id: id, label: label, hint: hint, min: min, max: max, step: step, unit: 'mm', get: function () { return ringVal(id); }, set: function (v) { curRs()[id] = v; } });
   }
-  ringSliders = [
+  var main = [
     s('offset', 'Nudge tot ∞-lijn', 'midden tot midden', -5, 20, 0.05),
+    sliderField({ id: 'mmPer1000', label: 'Schaal', hint: 'mm per 1000 lens-eenheden', min: 15, max: 35, step: 0.01, unit: 'mm', get: function () { return ringVal('mmPer1000'); }, set: function (v) { curRs().mmPer1000 = v; } })
+  ];
+  main.forEach(function (x) { $('ringSliders').appendChild(x); });
+  ringSliders = [
     s('notchDepth', 'Nudge: diepte', 'vanaf linkerrand', 2, 10, 0.05),
     s('notchWidth', 'Nudge: breedte', 'langs de strook', 1.5, 7, 0.05),
     s('notchFilletTop', 'Nudge: afronding bovenkant', '0 = rechte hoek', 0, 4, 0.05),
@@ -2219,14 +2279,13 @@ function buildRingSliders() {
     s('length', 'Lengte strook', 'korter = minder overlap', 200, 270, 0.1),
     s('width', 'Breedte strook', 'hoogte van de ring', 14, 26, 0.05)
   ];
-  ringSliders.forEach(function (x) { $('ringSliders').appendChild(x); });
+  ringSliders.forEach(function (x) { $('advSliders').appendChild(x); });
   var adv = [
-    sliderField({ id: 'mmPer1000', label: 'Schaal', hint: 'mm per 1000 lens-eenheden', min: 15, max: 35, step: 0.01, unit: 'mm', get: function () { return ringVal('mmPer1000'); }, set: function (v) { curRs().mmPer1000 = v; } }),
     sliderField({ id: 'radius', label: 'Kromming', hint: 'straal, 0 = recht', min: 0, max: 20000, step: 10, unit: 'mm', get: function () { return ringVal('radius'); }, set: function (v) { curRs().radius = v; } }),
     sliderField({ id: 'endZone', label: 'Lege zone onderaan', hint: '', min: 0, max: 40, step: 0.5, unit: 'mm', get: function () { return ringVal('endZone'); }, set: function (v) { curRs().endZone = v; } })
   ];
   adv.forEach(function (x) { $('advSliders').appendChild(x); });
-  ringSliders = ringSliders.concat(adv);
+  ringSliders = main.concat(ringSliders, adv);
 }
 var REF_HINT = { center: 'vanaf midden nudge', top: 'vanaf bovenrand nudge', bottom: 'vanaf onderrand nudge' };
 function infFvOf(l) { for (var i = 0; i < l.focus.length; i++) if (Engine.distOf(l.focus[i]) === Infinity) return Number(l.fv[i]); return null; }
@@ -2301,7 +2360,7 @@ function renderPages() {
   if (!total) {
     $('anchorWarn').hidden = true;
     $('pageInfo').innerHTML = '';
-    $('pageInfo').appendChild(el('b', '', f.name)); $('pageInfo').appendChild(document.createTextNode(' · nog geen stroken'));
+    $('pageInfo').appendChild(el('b', '', f.name)); $('pageInfo').appendChild(document.createTextNode('nog geen stroken'));
     box.appendChild(el('p', 'emptysheet', 'Deze map heeft nog geen lenzen op het vel. Laad .tl-bestanden of verplaats een lens naar ' + f.name + '.'));
     return;
   }
@@ -2309,7 +2368,7 @@ function renderPages() {
   renderAnchorWarn(f, pg);
   $('pageInfo').textContent = '';
   $('pageInfo').appendChild(el('b', '', f.name));
-  $('pageInfo').appendChild(document.createTextNode(' · ' + total + (total === 1 ? ' strook' : ' stroken') + ' · ' + pg.length + (pg.length === 1 ? ' vel A4' : ' vellen A4')));
+  $('pageInfo').appendChild(document.createTextNode(total + (total === 1 ? ' strook' : ' stroken') + ' op ' + pg.length + (pg.length === 1 ? ' vel A4' : ' vellen A4')));
   var availW = sc.clientWidth - 12, sticky = window.innerWidth > 760;
   var base = sticky ? Math.min(availW, (sc.clientHeight - 12) * 210 / 297) : Math.min(availW, 640);
   base = Math.max(base, 220);
@@ -2370,7 +2429,7 @@ function calSection(l, ring, lay) {
   var sec = el('section');
   sec.appendChild(el('h2', '', 'Schaal meten met het meetlabel'));
   var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
-  sec.appendChild(el('p', 'hint', 'Plak het meetlabel op de ring (0 = ' + refWord + ' van de nudge). Lees af bij oneindig en bij een afstand die op de lens staat. Kies een korte afstand: hoe verder van oneindig, hoe nauwkeuriger.'));
+  sec.appendChild(el('p', 'hint', 'Plak het meetlabel op de ring (0 = ' + refWord + ' van de nudge). Lees af bij ∞ en bij een korte afstand op de lens.'));
   var box = el('div', 'cal');
   var pts = [], infFv = null;
   for (var i = 0; i < l.focus.length; i++) {
@@ -2489,21 +2548,20 @@ function renderDetail() {
   var ring = ringOf(folderById(l.folderId) || activeFolder()), lay = Engine.layoutLens(l, ring);
 
   var head = el('section');
-  head.appendChild(el('h2', '', 'Gekozen strook'));
   var lh = el('div', 'lenshead');
   lh.appendChild(el('span', 'big', l.focal || l.topText));
-  lh.appendChild(el('span', 'who', [l.brandName, l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : ''].filter(Boolean).join(' · ')));
+  lh.appendChild(el('span', 'who', [l.brandName, l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : ''].filter(Boolean).join(' ')));
   head.appendChild(lh);
   root.appendChild(head);
   root.appendChild(tstopSection(l, function () { if (typeof refreshAuto === 'function') refreshAuto(); }));
 
   var cu = el('section');
-  cu.appendChild(el('h2', '', 'Close-up nudge'));
+  cu.appendChild(el('h2', '', 'Nudge'));
   var cbox = el('div', 'closeup'); cbox.id = 'closeup'; cu.appendChild(cbox);
   var g = ring.notch;
   var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
   var infHere = lay.inf ? lay.inf.v - ring.zeroV : ring.offsetInput;
-  cu.appendChild(el('p', 'hint', 'Uitsparing ' + fmtMM(g.depth) + ' mm diep en ' + fmtMM(g.h * 2) + ' mm breed. De ∞-lijn van deze lens ligt ' + String(Math.round(infHere * 100) / 100).replace('.', ',') + ' mm onder ' + refWord + ' van de nudge.'));
+  cu.appendChild(el('p', 'hint', 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ∞ ligt ' + String(Math.round(infHere * 100) / 100).replace('.', ',') + ' mm onder ' + refWord + ' van de nudge.'));
   if (isTiltaRing(profileOf(folderById(l.folderId)))) {
     var jl = el('a', 'btn small', 'Mal voor de Tilta ARRI-ring (STL)'); jl.href = JIG_URL; jl.target = '_blank'; jl.rel = 'noopener';
     if (window.__PWA__) jl.setAttribute('download', JIG_FILE);
@@ -2512,6 +2570,7 @@ function renderDetail() {
   root.appendChild(cu);
 
   var fields = el('section', 'stack');
+  fields.appendChild(el('h2', '', 'Strook'));
   var mf = el('label', 'field'); mf.appendChild(el('span', '', 'Map'));
   var ms = document.createElement('select'); ms.className = 'inp'; ms.id = 'f_folder';
   P.folders.forEach(function (x) { var o = el('option', '', x.name); o.value = x.id; ms.appendChild(o); });
@@ -2529,7 +2588,7 @@ function renderDetail() {
     botF.querySelector('input').placeholder = Engine.autoBottom(l) + '  (automatisch)';
   }
   fields.appendChild(topF); fields.appendChild(botF);
-  fields.appendChild(el('p', 'hint', 'Laat de tekstvelden leeg voor de automatische tekst met brandpuntsafstand en T-stop.'));
+  fields.appendChild(el('p', 'hint', 'Leeg laten = automatische tekst.'));
   root.appendChild(fields);
 
   var stats = el('div', 'stats');
@@ -2541,12 +2600,15 @@ function renderDetail() {
   if (none) addPill(stats, none + ' zonder cijfer', true);
   if (conf) addPill(stats, conf + ' overlapt', true);
   if (!lay.inf) addPill(stats, 'geen ∞ in bestand', true);
-  root.appendChild(stats);
-  root.appendChild(calSection(l, ring, lay));
+  fields.appendChild(stats);
 
-  var sec = el('section');
-  sec.appendChild(el('h2', '', 'Cijfers per afstand'));
-  sec.appendChild(el('p', 'hint', 'Auto kiest zelf. R = groot cijfer rechts, L = klein cijfer links, – = alleen een streepje. Het lijntje onder een knop toont wat auto nu kiest.'));
+  var cs = calSection(l, ring, lay), cm = moreBox('dCal', 'Schaal nameten');
+  Array.prototype.slice.call(cs.childNodes).forEach(function (n) { if (n.tagName !== 'H2') cm.body.appendChild(n); });
+  root.appendChild(cm.box);
+
+  var nOv = Object.keys(l.overrides || {}).length;
+  var mb = moreBox('dMarks', 'Cijfers per afstand', nOv ? nOv + ' aangepast' : ''), sec = mb.body;
+  sec.appendChild(el('p', 'hint', 'Auto kiest zelf. R = groot cijfer rechts, L = klein cijfer links, – = alleen een streepje. Het lijntje onder een knop toont wat auto kiest.'));
   var wrap = el('div', 'tablewrap'), t = el('table', 'marks');
   t.innerHTML = '<thead><tr><th>Afstand</th><th>Vanaf ∞</th><th>Plaats</th></tr></thead>';
   var tbody = el('tbody'), infV = lay.inf ? lay.inf.v : ring.offset;
@@ -2566,12 +2628,12 @@ function renderDetail() {
     td3.appendChild(seg); tr.appendChild(td3); tbody.appendChild(tr);
   });
   t.appendChild(tbody); wrap.appendChild(t); sec.appendChild(wrap);
-  if (Object.keys(l.overrides || {}).length) {
-    var rs = el('button', 'btn small', 'Alles terug op auto'); rs.type = 'button'; rs.style.marginTop = '10px';
+  if (nOv) {
+    var rs = el('button', 'btn small', 'Alles terug op auto'); rs.type = 'button';
     rs.onclick = function () { l.overrides = {}; changed(); };
-    sec.appendChild(rs);
+    var rr = el('div', 'row'); rr.appendChild(rs); sec.appendChild(rr);
   }
-  root.appendChild(sec);
+  root.appendChild(mb.box);
   if (l.source) root.appendChild(el('p', 'hint', 'Bron: ' + l.source));
   renderCloseup();
 }
@@ -2649,7 +2711,7 @@ $('libIn').onchange = function () {
   if (!f) return;
   f.text().then(function (txt) {
     var j; try { j = JSON.parse(txt); } catch (e) { toast(f.name + ' is geen bibliotheekbestand.', { err: true }); return; }
-    if (!j || j.app !== 'focusringlabels') { toast(f.name + ' is geen Focusringlabels-bibliotheek. Lensbestanden laad je via "Lensbestanden laden".', { err: true }); return; }
+    if (!j || j.app !== 'focusringlabels') { toast(f.name + ' is geen Focusringlabels-bibliotheek. Lensbestanden laad je via "Lenzen laden".', { err: true }); return; }
     openLibrary(j, f.name);
   });
 };
@@ -2917,7 +2979,7 @@ var isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 var MOD = isMac ? '⌘' : 'Ctrl+', SHIFT = isMac ? '⇧' : 'Shift+';
 $('btnUndo').title = 'Ongedaan maken (' + MOD + 'Z)';
 $('btnRedo').title = 'Opnieuw (' + SHIFT + MOD + 'Z)';
-[[MOD + 'Z', 'Ongedaan maken'], [SHIFT + MOD + 'Z', 'Opnieuw'], [MOD + 'O', 'Lensbestanden laden'], [MOD + 'E', 'PDF downloaden'],
+[[MOD + 'Z', 'Ongedaan maken'], [SHIFT + MOD + 'Z', 'Opnieuw'], [MOD + 'O', 'Lenzen laden'], [MOD + 'E', 'PDF downloaden'],
  [MOD + 'P', 'Printen'], [MOD + 'S', 'Bibliotheek bewaren'], [MOD + '1 – 4', 'Tabbladen']].forEach(function (k) {
   if (inViewer && (k[1] === 'Printen')) return;
   $('keyList').appendChild(el('dt', '', k[0])); $('keyList').appendChild(el('dd', '', k[1]));
@@ -3000,7 +3062,7 @@ function renderLibFile() {
   $('btnUnlink').hidden = !linked;
   $('btnLinkFile').textContent = linked ? 'Ander bestand kiezen…' : 'Automatisch bewaren in een bestand…';
   t.textContent = '';
-  if (!linked) t.textContent = 'Koppel je bibliotheek aan een bestand, bijvoorbeeld in iCloud Drive. Elke wijziging komt er dan vanzelf in, ook als je browsergegevens ooit gewist worden.';
+  if (!linked) t.textContent = 'Koppel je bibliotheek aan een bestand, bijvoorbeeld in iCloud Drive. Elke wijziging komt er vanzelf in.';
   else if (LF.perm !== 'granted') {
     t.appendChild(document.createTextNode('Gekoppeld aan ' + LF.name + '. Chrome vraagt opnieuw toestemming om daarin te bewaren. '));
     var b = el('button', 'linkbtn', 'Verbinden'); b.type = 'button'; b.onclick = lfReconnect; t.appendChild(b);
@@ -3080,7 +3142,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '24 · 13-10-2026 · creatieve stijlen, meerkleurig verloop, sierstrepen';
+var APP_VERSION = '25 · 13-10-2026 · strakkere, eenvoudigere interface';
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
