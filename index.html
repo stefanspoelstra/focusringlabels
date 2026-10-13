@@ -432,6 +432,13 @@ details[open] summary { margin-bottom: 10px; }
           </div>
         </div>
       </details>
+      <details class="more" id="dCorners">
+        <summary>Afgeronde hoeken <span class="sumval" id="cornerState"></span></summary>
+        <div class="body">
+          <div id="cornerSliders" class="stack"></div>
+          <p class="hint" id="cornerHint"></p>
+        </div>
+      </details>
       <section class="stack">
         <div class="row"><button class="btn small" id="btnStyleSave" type="button">Opmaak bewaren…</button></div>
         <form class="saveform stack" id="saveForm" hidden>
@@ -764,6 +771,9 @@ var Engine = (function () {
       var a = clamp(num(t && t.u0, 0), 0, 40), b = clamp(num(t && t.u1, a + 0.4), 0, 40);
       return { u0: Math.min(a, b), u1: Math.max(a, b), c: isHex(t && t.c) ? t.c : '#111111' };
     }).filter(function (t) { return t.u1 - t.u0 >= 0.05; });
+    // afgeronde hoeken van het label (straal in mm), boven = kant van de nudge
+    var cr = s.corners || {};
+    out.corners = { top: clamp(num(cr.top, 0.9), 0, 13), bottom: clamp(num(cr.bottom, 0.9), 0, 13) };
     var o = s.outline || {};
     out.outline = { on: !!o.on, width: clamp(num(o.width, 0.4), 0.05, 3), color: isHex(o.color) ? o.color : '#111111',
       pos: ['in', 'center', 'out'].indexOf(o.pos) > -1 ? o.pos : 'in' };
@@ -994,23 +1004,38 @@ var Engine = (function () {
     for (var i = 1; i <= n; i++) pts.push([u0 + (u1 - u0) * i / n, v0 + (v1 - v0) * i / n]);
     return pts;
   }
-  function outlineLocal(ring) {
-    var W = ring.W, T = ring.top, B = ring.bottom, rc = ring.corner, h = ring.notch.h, D = ring.notch.depth, rfB = ring.notch.fb, rfT = ring.notch.ft;
-    var p = [[rc, T]];
-    p = p.concat(linePts(rc, T, W - rc, T, 3));
-    p = p.concat(arcPts(W - rc, T + rc, rc, -90, 0, 6));
-    p = p.concat(linePts(W, T + rc, W, B - rc, 2));
-    p = p.concat(arcPts(W - rc, B - rc, rc, 0, 90, 6));
-    p = p.concat(linePts(W - rc, B, rc, B, 3));
-    p = p.concat(arcPts(rc, B - rc, rc, 90, 180, 6));
-    p = p.concat(linePts(0, B - rc, 0, h + rfB, 2));
+  // werkelijke hoekstralen: nooit breder dan het label, en bovenaan niet tot in de nudge
+  function cornerRadii(ring, style) {
+    var c = style && style.corners, t = c ? c.top : ring.corner, b = c ? c.bottom : ring.corner;
+    var maxT = Math.max(0, Math.min(ring.W / 2, -ring.top - ring.notch.h - ring.notch.ft - 0.2));
+    return { top: clamp(t, 0, maxT), bottom: clamp(b, 0, ring.W / 2), maxTop: maxT, maxBottom: ring.W / 2 };
+  }
+  // hoe ver tekst van de bovenkant (of onderkant) af moet om binnen een hoek met straal r te blijven,
+  // als hij m mm van de zijkant begint
+  function cornerDepth(r, m) {
+    if (r <= 0 || m >= r) return 0;
+    if (m <= 0) return r;
+    return r - Math.sqrt(r * r - (r - m) * (r - m));
+  }
+  function outlineLocal(ring, radii) {
+    var W = ring.W, T = ring.top, B = ring.bottom, h = ring.notch.h, D = ring.notch.depth, rfB = ring.notch.fb, rfT = ring.notch.ft;
+    var rt = radii ? radii.top : ring.corner, rb = radii ? radii.bottom : ring.corner;
+    var nt = Math.max(6, Math.ceil(rt * 5)), nb = Math.max(6, Math.ceil(rb * 5));
+    var p = [[rt, T]];
+    p = p.concat(linePts(rt, T, W - rt, T, 3));
+    p = p.concat(arcPts(W - rt, T + rt, rt, -90, 0, nt));
+    p = p.concat(linePts(W, T + rt, W, B - rb, 2));
+    p = p.concat(arcPts(W - rb, B - rb, rb, 0, 90, nb));
+    p = p.concat(linePts(W - rb, B, rb, B, 3));
+    p = p.concat(arcPts(rb, B - rb, rb, 90, 180, nb));
+    p = p.concat(linePts(0, B - rb, 0, h + rfB, 2));
     if (rfB > 0) p = p.concat(arcPts(rfB, h + rfB, rfB, 180, 270, 12));
     p = p.concat(linePts(rfB, h, D - h, h, 1));
     p = p.concat(arcPts(D - h, 0, h, 90, -90, 18));
     p = p.concat(linePts(D - h, -h, rfT, -h, 1));
     if (rfT > 0) p = p.concat(arcPts(rfT, -h - rfT, rfT, 90, 180, 12));
-    p = p.concat(linePts(0, -h - rfT, 0, T + rc, 2));
-    p = p.concat(arcPts(rc, T + rc, rc, 180, 270, 6));
+    p = p.concat(linePts(0, -h - rfT, 0, T + rt, 2));
+    p = p.concat(arcPts(rt, T + rt, rt, 180, 270, nt));
     p.pop();
     return p;
   }
@@ -1198,7 +1223,8 @@ var Engine = (function () {
     var T = makeT(x0, y0, ring.radius);
     var lay = layoutLens(lens, ring);
     var W = ring.W, items = [], ink = style.ink;
-    var outline = mapContour(polyCmds(outlineLocal(ring)), T);
+    var radii = cornerRadii(ring, style);
+    var outline = mapContour(polyCmds(outlineLocal(ring, radii)), T);
     var zg = zoneGeom(style, ring);
     zg.zones.forEach(function (z) { if (!z.skip) items.push(zoneItem(z, style.zones[z.key], ring, T)); });
     style.stripes.forEach(function (sp) {
@@ -1220,7 +1246,7 @@ var Engine = (function () {
     var nameStr = opts.lensText === false ? '' : (String(lens.bottomText || '').trim() || autoBottom(lens));
     if (nameStr) {
       var nl = textWidth(nameStr, 400, L.nameCap, L.nameTrack);
-      var vStart = ring.bottom - L.nameBottom, uBase = W - nameR;
+      var vStart = ring.bottom - Math.max(L.nameBottom, cornerDepth(radii.bottom, nameR - 0.3)), uBase = W - nameR;
       nameRange = [vStart - nl - 0.6, vStart + 0.6];
       shapes.push(mapContour(textContours(nameStr, 400, L.nameCap, L.nameTrack, function (fx, fy) { return [uBase - fy, vStart - fx]; }), T));
     }
@@ -1229,10 +1255,13 @@ var Engine = (function () {
       return rEdge;
     }
 
-    var top = String(lens.topText || '').trim(), topBase = ring.top + L.focalTop + L.focalCap;
+    var top = String(lens.topText || '').trim(), topBase0 = ring.top + L.focalTop + L.focalCap, topBase = topBase0;
+    // blok van x0 tot x1: zo ver omlaag dat het binnen de afgeronde hoeken blijft
+    var dropFor = function (x0, x1) { return topBase0 + Math.max(0, cornerDepth(radii.top, Math.min(x0, W - x1) - 0.3) - L.focalTop); };
     if (top) {
-      var tw = textWidth(top, 700, L.focalCap, 0.1);
-      text(top, 700, L.focalCap, W / 2 + L.focalShift - tw / 2, topBase, 0.1);
+      var tw = textWidth(top, 700, L.focalCap, 0.1), tx0 = W / 2 + L.focalShift - tw / 2;
+      topBase = dropFor(tx0, tx0 + tw);
+      text(top, 700, L.focalCap, tx0, topBase, 0.1);
     } else if (lens.focal) {
       // automatisch: groot brandpunt met de T-stop erachter (zonder "mm").
       // Binnen vaste marges (rand van het label / kleurband). Past het niet: eerst de T-stop
@@ -1249,10 +1278,12 @@ var Engine = (function () {
       }
       if (!tsS || wb + gT + wt <= lim1 - lim0) {
         var one = wb + (tsS ? gT + wt : 0), x = place(one);
+        topBase = dropFor(x, x + one);
         text(big, 700, L.focalCap, x, topBase, 0.1);
         if (tsS) text(tsS, 700, sCap, x + wb + gT, topBase, 0.04);
       } else {
         var xb = place(wb), mid = xb + wb / 2;
+        topBase = dropFor(xb, xb + wb);
         text(big, 700, L.focalCap, xb, topBase, 0.1);
         sCap = L.tstopMin; wt = textWidth(tsS, 700, sCap, 0.04);
         text(tsS, 700, sCap, mid - wt / 2, topBase + 0.8 + sCap, 0.04);
@@ -1667,7 +1698,7 @@ var Engine = (function () {
     prettyBrand: prettyBrand, brandKey: brandKey, autoBottom: autoBottom, autoTop: autoTop, tstopFrom: tstopFrom,
     layoutLens: layoutLens, buildStrip: buildStrip, buildPages: buildPages,
     pageSVG: pageSVG, buildPDF: buildPDF, textWidth: textWidth, distOf: distOf, buildCalibPages: buildCalibPages,
-    setLang: setLang, lang: function () { return LANG; }
+    setLang: setLang, lang: function () { return LANG; }, cornerRadii: cornerRadii
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
@@ -1737,6 +1768,11 @@ var I18N = (function () {
     'Omlijning': 'Outline',
     'aan': 'on',
     'Lijn om het hele label': 'Line around the whole label',
+    'Afgeronde hoeken': 'Rounded corners',
+    'Bovenkant': 'Top',
+    'Onderkant': 'Bottom',
+    'straal, 0 = rechte hoek': 'radius, 0 = square corner',
+    'Bij grote hoeken schuiven de tekst bovenaan en de lensnaam vanzelf iets naar binnen.': 'With large corners, the text at the top and the lens name move inward automatically.',
     'Kleur': 'Color',
     'Plaats': 'Position',
     'Binnen de rand': 'Inside the edge',
@@ -2069,7 +2105,9 @@ var I18N = (function () {
     [/^Versie (.+)$/, 'Version $1'],
     [/^Gemeten op de (.+)\. Elke andere lens volgt uit zijn eigen lensbestand\. Opnieuw meten: kies een lens en open Schaal nameten\.$/,
       'Measured on the {1}. Every other lens follows from its own lens file. To re-measure: choose a lens and open Re-measure the scale.'],
-    [/^lens met ∞ = (\d+)$/, 'lens with ∞ = $1']
+    [/^lens met ∞ = (\d+)$/, 'lens with ∞ = $1'],
+    [/^Bovenaan wordt het (.+) mm: meer past niet boven de nudge\. (.+)$/, 'At the top it becomes $1 mm: more does not fit above the nudge. {2}'],
+    [/^Onderaan wordt het (.+) mm, een halve cirkel\. (.+)$/, 'At the bottom it becomes $1 mm, a half circle. {2}']
   ];
 
   var has = Object.prototype.hasOwnProperty;
@@ -2655,9 +2693,10 @@ function renderStyle() {
     g[1].forEach(function (it) {
       var k = it[0], st = it[2];
       sw.appendChild(swatch(it[1], st, f.styleKey === k, function () {
-        var keep = clone(f.style.outline);
+        var keep = clone(f.style.outline), keepC = clone(f.style.corners);
         f.style = Engine.normalizeStyle(clone(st));
-        if (k !== 'mijn' && k.indexOf('u:') !== 0) f.style.outline = keep;
+        // omlijning en hoeken zijn vorm, geen kleur: die blijven staan bij een ander startpunt
+        if (k !== 'mijn' && k.indexOf('u:') !== 0) { f.style.outline = keep; f.style.corners = keepC; }
         f.styleKey = k; f.styleBase = k.indexOf('u:') === 0 ? k.slice(2) : null; changed();
       }, k === 'mijn' || k.indexOf('u:') === 0));
     });
@@ -2699,12 +2738,32 @@ function renderStyle() {
     $('olSliders').appendChild(olSlider);
   }
   olSlider._show();
+  renderCorners(f);
   $('olOn').checked = ol.on; $('olOpts').hidden = !ol.on;
   if ($('olColor').value !== ol.color) $('olColor').value = ol.color;
   $('olPos').value = ol.pos;
   $('olHint').textContent = { in: 'De lijn staat helemaal op het label, langs de rand en om de nudge heen.',
     center: 'De lijn ligt half op het label. Snij precies door het midden van de lijn.',
     out: 'De lijn ligt buiten het label. Snij langs de binnenkant van de lijn, dan zie je hem niet meer op het label.' }[ol.pos];
+}
+// afgeronde hoeken van het label, boven (kant van de nudge) en onder
+var cornerSliders = [];
+function renderCorners(f) {
+  if (!$('cornerSliders')._built) {
+    $('cornerSliders')._built = true;
+    cornerSliders = [['top', 'Bovenkant'], ['bottom', 'Onderkant']].map(function (c) {
+      return sliderField({ id: 'corner_' + c[0], label: c[1], hint: 'straal, 0 = rechte hoek', min: 0, max: 10, step: 0.05, unit: 'mm',
+        get: function () { return activeFolder().style.corners[c[0]]; }, set: function (v) { activeFolder().style.corners[c[0]] = Math.max(0, v); } });
+    });
+    cornerSliders.forEach(function (s) { $('cornerSliders').appendChild(s); });
+  }
+  cornerSliders.forEach(function (s) { s._show(); });
+  var c = f.style.corners, eff = Engine.cornerRadii(ringOf(f), f.style);
+  $('cornerState').textContent = c.top === 0.9 && c.bottom === 0.9 ? '' : dec(r2(eff.top)) + ' / ' + dec(r2(eff.bottom)) + ' mm';
+  var hint = 'Bij grote hoeken schuiven de tekst bovenaan en de lensnaam vanzelf iets naar binnen.';
+  if (c.top > eff.maxTop + 1e-6) hint = 'Bovenaan wordt het ' + dec(r2(eff.maxTop)) + ' mm: meer past niet boven de nudge. ' + hint;
+  if (c.bottom > eff.maxBottom + 1e-6) hint = 'Onderaan wordt het ' + dec(r2(eff.maxBottom)) + ' mm, een halve cirkel. ' + hint;
+  $('cornerHint').textContent = hint;
 }
 function mark() { var f = activeFolder(); f.styleKey = 'eigen'; }
 function mix(a, b, t) {
@@ -3810,7 +3869,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '29 · ' + (LANG === 'en' ? '2026-10-13 · ∞ fixed for the Tilta ARRI ring' : '13-10-2026 · ∞ vast voor de Tilta ARRI-ring');
+var APP_VERSION = '30 · ' + (LANG === 'en' ? '2026-10-13 · adjustable label corners' : '13-10-2026 · afgeronde hoeken instelbaar');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
