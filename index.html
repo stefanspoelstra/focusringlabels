@@ -485,10 +485,10 @@ details[open] summary { margin-bottom: 10px; }
 var Engine = (function () {
   'use strict';
 
-  // Gemeten aan Dulenses_PL_nudge-5mm.pdf (300 dpi): RingThing-maat voor de ARRI-ring.
+  // ARRI-ring op de ARRI WCU-4 (standaardmaat, gemeten aan een bestaand labelvel op 300 dpi).
   var RINGS = {
-    'arri-ringthing': {
-      label: 'ARRI WCU-4 · ARRI-ring (RingThing-maat)',
+    'arri-wcu4': {
+      label: 'ARRI WCU-4-ring',
       W: 19.39,          // breedte strook
       top: -9.48,        // bovenkant t.o.v. nudge-midden
       length: 253.02,    // totale lengte strook
@@ -750,8 +750,12 @@ var Engine = (function () {
   // ---------- ring + transform ----------
   // rs = instellingen van de gebruiker; geeft complete ringmaten terug
   // oude sleutels uit eerdere versies
-  var ALIAS = { 'wcu4-tilta': 'arri-ringthing', 'wcu4-tilta-recht': 'tilta-nucleus' };
-  function presetKey(k) { k = ALIAS[k] || k; return RINGS[k] ? k : 'tilta-nucleus'; }
+  var ALIAS = { 'wcu4-tilta': 'arri-wcu4', 'wcu4-tilta-recht': 'tilta-nucleus' };
+  function presetKey(k) {
+    k = ALIAS[k] || k;
+    if (!RINGS[k] && /^arri-/.test(String(k))) k = 'arri-wcu4';   // oudere sleutel voor dezelfde ARRI-ring
+    return RINGS[k] ? k : 'tilta-nucleus';
+  }
   // alle maten expliciet vastleggen (voor een ringprofiel, zonder verborgen standaardwaarden)
   function snapshotRing(rs) {
     var r = ringFor(rs);
@@ -1506,7 +1510,18 @@ function newFolder(name, key, presetKey) {
   return { id: uid('f'), key: key || Engine.brandKey(name), name: name, styleKey: presetKey, style: Engine.normalizeStyle(clone(Engine.STYLES[presetKey])), open: true, profileId: pid };
 }
 // ---------- ringprofielen: elk profiel bevat alle maten, zonder verborgen lagen ----------
-var TEMPLATE_NAMES = { 'tilta-nucleus': 'Tilta ARRI-ring op Nucleus-M II', 'arri-ringthing': 'ARRI-ring (RingThing-maat)' };
+var TEMPLATE_NAMES = { 'tilta-nucleus': 'Tilta ARRI-ring op Nucleus-M II', 'arri-wcu4': 'ARRI WCU-4-ring' };
+// v17: oude profielnamen en sleutels van de ARRI-ring opschonen
+function migr17(j) {
+  if (j.migr >= 17) return;
+  var old = /ring\s*-?\s*thing/i;
+  (j.profiles || []).forEach(function (x) {
+    if (x.ring) x.ring.preset = Engine.presetKey(x.ring.preset);
+    var n = String(x.name || '');
+    if (old.test(n)) x.name = n.replace(/ARRI-ring\s*\([^)]*\)/i, 'ARRI WCU-4-ring').replace(/\s*\([^)]*ring\s*-?\s*thing[^)]*\)/ig, '').replace(old, 'ARRI WCU-4').trim() || 'ARRI WCU-4-ring';
+  });
+  j.migr = 17;
+}
 // v16: Tilta-profielen heten nu 'Tilta ARRI-ring' en krijgen de gemeten nudge (4 × 3,3 mm) als die nog op de oude maat stond
 function migr16(j) {
   if (j.migr >= 16) return;
@@ -1554,7 +1569,7 @@ function renderDefaults() {
   $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Instellen als standaard';
 }
 function defaults() {
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 16, profiles: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 17, profiles: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   var lens = Engine.parseLensFile(JSON.stringify(SAMPLE_TL), 'DULENS PL 85.tl');
   fileLens(lens);
@@ -1588,7 +1603,7 @@ function migrate(j) {
     j.defaults = j.defaults && typeof j.defaults === 'object' ? j.defaults : {};
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
-    var save3 = P; P = j; toV3(j); migr16(j); P = save3;
+    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); P = save3;
     return j;
   }
   // v1: één project zonder mappen
@@ -1605,7 +1620,7 @@ function migrate(j) {
   });
   if (!P.folders.length) { var nf = newFolder(old.name || 'Lenzen'); nf.style = clone(style); P.folders.push(nf); }
   P.active = P.folders[0].id;
-  toV3(P); migr16(P);
+  toV3(P); migr16(P); migr17(P);
   var out = P; P = save2;
   return out;
 }
@@ -2304,12 +2319,6 @@ function renderDetail() {
   var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
   var infHere = lay.inf ? lay.inf.v - ring.zeroV : ring.offsetInput;
   cu.appendChild(el('p', 'hint', 'Uitsparing ' + fmtMM(g.depth) + ' mm diep en ' + fmtMM(g.h * 2) + ' mm breed. De ∞-lijn van deze lens ligt ' + String(Math.round(infHere * 100) / 100).replace('.', ',') + ' mm onder ' + refWord + ' van de nudge.'));
-  // nok van de RingThing WCU-4-mal: 3,0 mm breed, 4,15 mm vanaf de rand, 3,5 mm hoog
-  var reach = g.h >= 1.5 ? (g.depth - g.h) + Math.sqrt(g.h * g.h - 2.25) : 0;
-  var jigOk = g.h * 2 >= 3.25 && reach >= 4.25;
-  var jp = el('div', 'stats'); jp.style.marginTop = '8px';
-  addPill(jp, jigOk ? 'Past over de nok van de RingThing-mal' : g.h * 2 < 3.25 ? 'Te smal voor de nok van de RingThing-mal (min. 3,3 mm)' : 'Niet diep genoeg voor de nok van de RingThing-mal', !jigOk);
-  cu.appendChild(jp);
   root.appendChild(cu);
 
   var fields = el('section', 'stack');
@@ -2877,7 +2886,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '21 · 13-10-2026 · web-app, ongedaan maken, bestand';
+var APP_VERSION = '22 · 13-10-2026 · ARRI WCU-4-ring hernoemd';
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
