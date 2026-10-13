@@ -318,7 +318,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 .dock { display: none; }
 @media (max-width: 760px) {
   /* volgorde op de telefoon: instellingen, dan de gekozen lens, dan het vel */
-  .detail { order: 2; }
+  .detail { order: 2; border-left: 0; border-top: 1px solid var(--line); }
   .stage { order: 3; }
   .dock:not([hidden]) { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
     background: var(--mat); color: var(--mat-ink); padding: 6px 12px calc(10px + env(safe-area-inset-bottom, 0px));
@@ -357,10 +357,25 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
   #printArea svg { display: block; width: 210mm; height: 297mm; page-break-after: always; break-after: page; }
   html, body { background: #fff; }
 }
-@media (max-width: 1220px) {
-  .layout { grid-template-columns: 312px minmax(0, 1fr); }
-  .detail { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+/* smaller venster (bijv. half scherm op de MacBook): lensinstellingen links onder het paneel, het vel ernaast */
+@media (min-width: 761px) and (max-width: 1220px) {
+  .layout { grid-template-columns: 312px minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .panel { grid-column: 1; grid-row: 1; }
+  .detail { grid-column: 1; grid-row: 2; border-left: 0; border-right: 1px solid var(--line); border-top: 2px solid var(--ink); }
+  .stage { grid-column: 2; grid-row: 1 / span 2; }
 }
+/* groot scherm: paneel en lensinstellingen scrollen elk los, het vel staat stil in het midden */
+@media (min-width: 1221px) {
+  .panel, .detail { position: sticky; top: calc(var(--barH, 57px) + env(safe-area-inset-top, 0px)); align-self: start;
+    height: calc(100vh - var(--barH, 57px)); height: calc(100dvh - var(--barH, 57px) - env(safe-area-inset-top, 0px));
+    overflow-y: auto; overscroll-behavior: contain; }
+  .panel .tabs { top: 0; }
+}
+/* klik-hint bij het vel alleen met muis of trackpad */
+.stagehint { color: var(--mat-ink); opacity: 0.7; font-weight: 400; margin-left: 10px; }
+@media (hover: none), (max-width: 760px) { .stagehint { display: none; } }
+.zoompct { color: var(--mat-ink); font: 500 13px/1 var(--font-ui); background: none; border: 1px solid var(--mat-line-2); border-radius: 999px; padding: 3px 8px; cursor: pointer; }
+.zoompct:hover { color: #fff; border-color: var(--mat-ink); }
 @media (min-width: 761px) {
   .stage {
     position: sticky; top: calc(var(--barH, 57px) + env(safe-area-inset-top, 0px)); align-self: start;
@@ -627,7 +642,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
     <div class="stagebar">
       <span id="pageInfo"></span>
       <button type="button" class="stagewarn" id="anchorWarn" hidden></button>
-      <label class="zoom">Zoom <input type="range" id="zoom" min="50" max="500" step="10" value="100"></label>
+      <label class="zoom">Zoom <input type="range" id="zoom" min="50" max="500" step="10" value="100"><button type="button" class="zoompct" id="zoomPct" title="Terug naar passend" hidden></button></label>
     </div>
     <div class="pagescroll"><div class="pages" id="pages"></div></div>
   </section>
@@ -1848,6 +1863,8 @@ var I18N = (function () {
     'Nog geen .tl-bestanden bij de hand?': 'No .tl files at hand?',
     'Voorbeeld bekijken': 'View an example',
     'Inzoomen': 'Zoom in',
+    'Klik op een strook om hem te kiezen': 'Click a strip to select it',
+    'Terug naar passend': 'Back to fit',
     'Voorbeeld 50 mm geladen. Dit is een verzonnen lens om de app te bekijken.': 'Example 50 mm loaded. This is a made-up lens to try out the app.',
     'Profiel': 'Profile',
     'Een profiel bevat de ring en het label. Alles op dit tabblad geldt voor elke map met dit profiel.': 'A profile holds the ring and the label. Everything on this tab applies to every folder with this profile.',
@@ -3248,9 +3265,10 @@ function renderPages() {
   $('pageInfo').textContent = '';
   $('pageInfo').appendChild(el('b', '', f.name));
   $('pageInfo').appendChild(document.createTextNode(total + (total === 1 ? ' strook' : ' stroken') + ' op ' + pg.length + (pg.length === 1 ? ' vel A4' : ' vellen A4')));
+  var hint = el('span', 'stagehint', 'Klik op een strook om hem te kiezen'); $('pageInfo').appendChild(hint);
   var availW = sc.clientWidth - 12, sticky = window.innerWidth > 760;
   var base = sticky ? Math.min(availW, (sc.clientHeight - 12) * 210 / 297) : Math.min(availW, 640);
-  base = Math.max(base, 220);
+  base = Math.max(base, 220); sheetBase = base;
   var hl = getComputedStyle(document.documentElement).getPropertyValue('--sel').trim() || '#ff5a36';
   pg.forEach(function (p, i) {
     var d = el('div', 'sheet'); d.style.width = Math.round(base * z) + 'px';
@@ -3258,7 +3276,32 @@ function renderPages() {
     box.appendChild(d);
   });
   sc.scrollTop = keepT; sc.scrollLeft = keepL;
+  $('zoomPct').hidden = z === 1; $('zoomPct').textContent = Math.round(z * 100) + '%';
 }
+// zoom: alleen de breedte van de vellen aanpassen (snel, ook bij knijpen op het trackpad)
+var sheetBase = 0;
+function applyZoom() {
+  var z = Number($('zoom').value) / 100;
+  Array.prototype.forEach.call(document.querySelectorAll('#pages .sheet'), function (d) { d.style.width = Math.round(sheetBase * z) + 'px'; });
+  $('zoomPct').hidden = z === 1; $('zoomPct').textContent = Math.round(z * 100) + '%';
+}
+function setZoom(pct, ax, ay) {
+  var sc = document.querySelector('.pagescroll'), old = Number($('zoom').value);
+  pct = Math.max(50, Math.min(500, Math.round(pct)));
+  if (pct === old) return;
+  var r = sc.getBoundingClientRect(), px = ax === undefined ? r.width / 2 : ax - r.left, py = ay === undefined ? r.height / 2 : ay - r.top;
+  var cx = sc.scrollLeft + px, cy = sc.scrollTop + py, k = pct / old;
+  $('zoom').value = pct; applyZoom();
+  sc.scrollLeft = cx * k - px; sc.scrollTop = cy * k - py;   // het punt onder de cursor blijft staan
+}
+// knijpen op het trackpad (of ⌘/Ctrl + scrollen) zoomt het vel in plaats van de hele pagina
+document.querySelector('.pagescroll').addEventListener('wheel', function (e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  var dy = Math.max(-60, Math.min(60, e.deltaY));   // trackpad: kleine stapjes, muiswiel: grote; beide rustig
+  setZoom(Number($('zoom').value) * Math.exp(-dy * 0.004), e.clientX, e.clientY);
+}, { passive: false });
+$('zoomPct').addEventListener('click', function (e) { e.preventDefault(); setZoom(100); });
 $('pages').addEventListener('click', function (e) {
   var g = e.target.closest && e.target.closest('[data-lens]');
   if (g) { sel = g.getAttribute('data-lens'); changed(); if (narrowMQ.matches) setTimeout(function () { $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); }
@@ -3389,9 +3432,10 @@ function tstopSection(l, onChange) {
     x.tstop = cleanTs(v); cache = {}; persist(); renderPages(); renderCloseup(); renderFolders();
     if (x === l) onChange();
   }
+  var nFocal = {}; ls.forEach(function (x) { nFocal[x.focal] = (nFocal[x.focal] || 0) + 1; });
   ls.forEach(function (x) {
     var row = el('label', 'tsrow' + (x.id === l.id ? ' cur' : ''));
-    row.appendChild(el('span', 'tsf', (x.focal || '?') + ' mm'));
+    row.appendChild(el('span', 'tsf', (x.focal || '?') + ' mm' + (nFocal[x.focal] > 1 && (x.series || x.brandName) ? ' ' + (x.series || x.brandName) : '')));
     row.appendChild(el('span', 'tsT', 'T'));
     var i = document.createElement('input'); i.type = 'text'; i.className = 'inp num'; i.id = x.id === l.id ? 'f_tstop' : 'ts_' + x.id;
     i.maxLength = 5; i.inputMode = 'decimal'; i.placeholder = '–'; i.value = x.tstop || '';
@@ -3636,7 +3680,7 @@ $('btnDelFolder').onclick = function () {
     P.folders.splice(idx, 0, f); ls.forEach(function (l, i) { P.lenses.splice(Math.min(pos[i], P.lenses.length), 0, l); }); P.active = f.id; changed();
   } }, ms: 7000 });
 };
-$('zoom').addEventListener('input', renderPages);
+$('zoom').addEventListener('input', applyZoom);
 function measureBar() { document.documentElement.style.setProperty('--barH', document.querySelector('.bar').offsetHeight + 'px'); }
 // de kop kan van hoogte veranderen (lettertype geladen, knop erbij, andere taal): dan opnieuw meten
 if (window.ResizeObserver) new ResizeObserver(function () { measureBar(); }).observe(document.querySelector('.bar'));
@@ -4084,7 +4128,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '35 · ' + (LANG === 'en' ? '2026-10-14 · label stays in view on your phone' : '14-10-2026 · label in beeld op de telefoon');
+var APP_VERSION = '36 · ' + (LANG === 'en' ? '2026-10-14 · smoother on the MacBook' : '14-10-2026 · prettiger op de MacBook');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
