@@ -2336,6 +2336,21 @@ function migr17(j) {
   });
   j.migr = 17;
 }
+// v33: geen voorbeeldlens meer. Een bibliotheek met alléén de oude voorbeeldlens (Dulens 85 mm) gaat terug naar
+// het startscherm; de map blijft, met opmaak en profiel, maar heet weer 'Lenzen'. Staan er meer lenzen in, dan blijft
+// alles staan: de voorbeeldlens is dan niet te onderscheiden van een eigen Dulens 85 mm.
+function migr33(j) {
+  if (j.migr >= 33) return;
+  var ls = j.lenses || [], fs = j.folders || [];
+  if (ls.length === 1 && fs.length === 1 && ls[0].folderId === fs[0].id) {
+    var smp = Engine.parseLensFile(JSON.stringify(SAMPLE_TL), 'DULENS PL 85.tl'), l = ls[0];
+    if (String(l.source) === 'DULENS PL 85.tl' && JSON.stringify((l.fv || []).map(Number)) === JSON.stringify(smp.fv.map(Number))) {
+      j.lenses = []; fs[0].name = T('Lenzen'); fs[0].key = Engine.brandKey(fs[0].name); fs[0].starter = true;
+    }
+  }
+  fs.forEach(function (f) { if (f.starter && (f.name === 'Mijn lenzen' || f.name === 'My lenses')) { f.name = T('Lenzen'); f.key = Engine.brandKey(f.name); } });
+  j.migr = 33;
+}
 // v31: afgeronde hoeken horen bij het profiel (ring en label), niet meer bij de opmaak van een map
 function migr31(j) {
   if (j.migr >= 31) return;
@@ -2411,10 +2426,10 @@ function renderDefaults() {
   $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Maak standaard';
 }
 function defaults() {
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 31, profiles: [], saved: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 33, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   // geen voorbeeldlens meer: één lege startmap, die het eerste merk overneemt (met opmaak en profiel die je al koos)
-  var f = newFolder(T('Mijn lenzen')); f.starter = true; P.folders.push(f);
+  var f = newFolder(T('Lenzen')); f.starter = true; P.folders.push(f);
   P.active = f.id;
   return P;
 }
@@ -2445,7 +2460,7 @@ function migrate(j) {
     j.defaults = j.defaults && typeof j.defaults === 'object' ? j.defaults : {};
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
-    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); P = save3;
+    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); migr33(j); P = save3;
     j.saved = (Array.isArray(j.saved) ? j.saved : []).filter(function (x) { return x && x.style; })
       .map(function (x) { return { id: x.id || uid('s'), name: String(x.name || 'Opmaak').slice(0, 40), style: Engine.normalizeStyle(x.style) }; });
     return j;
@@ -2464,7 +2479,7 @@ function migrate(j) {
   });
   if (!P.folders.length) { var nf = newFolder(old.name || 'Lenzen'); nf.style = clone(style); P.folders.push(nf); }
   P.active = P.folders[0].id;
-  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P);
+  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P); migr33(P);
   var out = P; P = save2;
   return out;
 }
@@ -2505,7 +2520,7 @@ function loadExample() {
   toast('Voorbeeld 50 mm geladen. Dit is een verzonnen lens om de app te bekijken.', { action: { label: 'Weghalen', run: function () {
     P.lenses = P.lenses.filter(function (x) { return x !== l; });
     if (!lensesOf(f.id).length) {
-      if (P.folders.length === 1) { f.name = T('Mijn lenzen'); f.key = Engine.brandKey(f.name); f.starter = true; }
+      if (P.folders.length === 1) { f.name = T('Lenzen'); f.key = Engine.brandKey(f.name); f.starter = true; }
       else { P.folders = P.folders.filter(function (x) { return x !== f; }); P.active = P.folders[0].id; }
     }
     sel = null; changed();
@@ -3975,7 +3990,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '33 · ' + (LANG === 'en' ? '2026-10-13 · start screen instead of a sample lens' : '13-10-2026 · startscherm in plaats van voorbeeldlens');
+var APP_VERSION = '34 · ' + (LANG === 'en' ? '2026-10-14 · no sample lens or folder' : '14-10-2026 · geen voorbeeldlens of -map meer');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
