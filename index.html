@@ -140,6 +140,14 @@ body.dragging .drop { border-color: var(--accent); background: var(--accent-soft
 .folder.open .caret { transform: rotate(90deg); }
 .chip { width: 20px; height: 26px; border-radius: 3px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
 .chip span { display: block; height: 100%; }
+.chip { position: relative; }
+.chip i { position: absolute; top: 0; bottom: 0; display: block; }
+.stripes { display: flex; flex-direction: column; gap: 6px; }
+.stripe { display: grid; grid-template-columns: 52px 1fr 1fr auto; gap: 6px; align-items: end; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); }
+.stripe label { display: grid; gap: 2px; font-size: 11px; color: var(--muted); }
+.stripe input[type=color] { width: 100%; height: 28px; border: 1px solid var(--line); border-radius: var(--r); background: var(--raised); padding: 2px; cursor: pointer; }
+.stripe input[type=number] { width: 100%; padding: 4px 6px; }
+.zone .stopbtns { display: flex; gap: 2px; }
 .fname { font: 600 17px/1.1 var(--font-cond); letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fcount { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .lenslist { list-style: none; margin: 2px 0 6px 24px; padding: 0 0 0 8px; border-left: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; }
@@ -351,6 +359,10 @@ details[open] summary { margin-bottom: 10px; }
         <label class="check"><input type="checkbox" id="fullFill"> Eén vlak over het hele label (geen splitsing)</label>
         <div id="geomSliders" class="stack"></div>
         <div class="zones" id="zones"></div>
+        <h3>Sierstrepen</h3>
+        <p class="hint">Smalle strepen over de hele lengte, gemeten vanaf de linkerrand. Mooi in of naast de rand links.</p>
+        <div class="stripes" id="stripes"></div>
+        <div class="row"><button class="btn small" id="btnAddStripe" type="button">+ Streep</button></div>
         <div class="inkrow"><span class="zname flabel">Inkt (cijfers en streepjes)</span><input type="color" id="cInk" aria-label="Inktkleur"></div>
         <h3>Omlijning</h3>
         <label class="check"><input type="checkbox" id="olOn"> Omlijning om het hele label</label>
@@ -551,10 +563,18 @@ var Engine = (function () {
     if (o.split !== undefined) st.split = o.split;
     if (o.bandRc) st.zones.bandR = solid(o.bandRc);
     if (o.zones) for (var k in o.zones) st.zones[k] = o.zones[k];
+    if (o.fullFill) st.fullFill = true;
+    if (o.stripes) st.stripes = o.stripes.map(function (t) { return { u0: t[0], u1: t[1], c: t[2] }; });
     return st;
   }
   function yg(a, b) { return { mode: 'y', c: [a, a, b, b] }; }
   function xg(a, b) { return { mode: 'x', c: [a, b, a, b] }; }
+  // verloop langs het label door meerdere kleuren, gelijk verdeeld
+  function ys(list) {
+    return { mode: 'y', c: [list[0], list[0], list[list.length - 1], list[list.length - 1]],
+      stops: list.map(function (c, i) { return [i / (list.length - 1), c]; }) };
+  }
+  function xy(a, b, c, d) { return { mode: 'xy', c: [a, b, c, d] }; }
   // Volgorde = volgorde in de app. Groepen: effen (per lensset een kleur), speciaal, donker, verloop.
   var STYLES = {
     'teal-geel': S('Teal / geel', 'Effen', { band: '#0bb4ae', left: '#f5f6c7', right: '#ede834' }),
@@ -597,7 +617,36 @@ var Engine = (function () {
     'heel-roos': S('Heel label: roos', 'Heel label', { band: '#b0305c', left: '#fff5f8', right: '#fff5f8', ink: '#1a0d12',
       zones: { left: yg('#fff5f8', '#ff9cc0') } }),
     'heel-nacht': S('Heel label: nacht', 'Heel label', { band: '#22d3ee', left: '#24456b', right: '#24456b', ink: '#ffffff',
-      zones: { left: yg('#2c5a8a', '#0d1726') } })
+      zones: { left: yg('#2c5a8a', '#0d1726') } }),
+
+    // creatief: meerkleurige verlopen en sierstrepen (strepen = [van mm, tot mm, kleur], vanaf de linkerrand)
+    'neon': S('Neon', 'Creatief', { band: '#ff2e88', left: '#120c24', right: '#120c24', ink: '#ffffff', bandL: 1.8, bandR: 1.0, bandRc: '#00e5ff', fullFill: true,
+      zones: { left: ys(['#1d0f3d', '#120c24', '#081a33']) }, stripes: [[2.1, 2.35, '#00e5ff']] }),
+    'cyber': S('Cyber', 'Creatief', { band: '#f9f002', left: '#0b0f1a', right: '#0b1f2e', ink: '#f4f4f4', bandL: 2.0,
+      zones: { left: xg('#0b0f1a', '#121a2c'), right: yg('#1c0b33', '#0b2433') }, stripes: [[2.0, 2.3, '#ff2a6d']] }),
+    'retro': S('Retro 70', 'Creatief', { band: '#8c3b12', left: '#fff4dc', right: '#fff4dc', ink: '#2b1608', bandL: 0, fullFill: true,
+      zones: { left: yg('#fff4dc', '#ffe2b0') }, stripes: [[0, 0.9, '#8c3b12'], [0.9, 1.8, '#e8590c'], [1.8, 2.7, '#f59f00']] }),
+    'race': S('Racestreep', 'Creatief', { band: '#111111', left: '#ffffff', right: '#ffd400', ink: '#111111', bandL: 3.0, bandR: 0.9, bandRc: '#e10600',
+      stripes: [[0.8, 1.1, '#ffffff'], [1.6, 1.9, '#ffffff']] }),
+    'avondrood': S('Avondrood', 'Creatief', { band: '#4a1d6b', left: '#ffe29a', right: '#ffe29a', ink: '#1d0b22', fullFill: true,
+      zones: { left: ys(['#ffe29a', '#ffb36b', '#ff8a8f', '#d08ad8']) } }),
+    'regenboog': S('Pastel regenboog', 'Creatief', { band: '#2b2d42', left: '#ffd1d1', right: '#ffd1d1', ink: '#141414', bandL: 1.2, fullFill: true,
+      zones: { left: ys(['#ffd1d1', '#ffe1b8', '#fff6b3', '#d4f7c5', '#c9e6ff', '#e2d4ff']) } }),
+    'holo': S('Holografisch', 'Creatief', { band: '#8c99a6', left: '#ffc8e6', right: '#ffc8e6', ink: '#121212', fullFill: true,
+      zones: { left: xy('#ffc8e6', '#b5f2ff', '#d9c8ff', '#c8ffe0') }, stripes: [[0.6, 0.85, '#ffffff']] }),
+    'lava': S('Lava', 'Creatief', { band: '#ff8a00', left: '#3a0a0a', right: '#3a0a0a', ink: '#ffffff', bandL: 1.8, fullFill: true,
+      zones: { left: ys(['#3a0a0a', '#6b130c', '#a3230c']) }, stripes: [[1.8, 2.05, '#ffd000']] }),
+    'jungle': S('Jungle', 'Creatief', { band: '#1f5e3a', left: '#f1fadc', right: '#f1fadc', ink: '#0c1f0c', bandL: 1.8, fullFill: true,
+      zones: { left: ys(['#f1fadc', '#c9eb94', '#8fd18a']) }, stripes: [[1.8, 2.05, '#f2c14e']] }),
+    'goud': S('Goud', 'Creatief', { band: '#6e4f0e', left: '#fff2c2', right: '#fff2c2', ink: '#1a1205', fullFill: true,
+      zones: { left: ys(['#fff2c2', '#e9c766', '#fff0bd', '#d9ae45', '#f7e19a']) } }),
+    'chroom': S('Chroom', 'Creatief', { band: '#22282f', left: '#f4f6f8', right: '#f4f6f8', ink: '#0d1117', fullFill: true,
+      zones: { left: ys(['#f4f6f8', '#c3cbd3', '#eef1f4', '#a9b4bf', '#e6eaee']) }, stripes: [[1.61, 1.86, '#e10600']] }),
+    'ijs': S('IJs', 'Creatief', { band: '#2f6fd1', left: '#ffffff', right: '#ffffff', ink: '#0b1b33', bandL: 2.2, fullFill: true,
+      zones: { left: ys(['#ffffff', '#e3f4ff', '#b9e0ff']) }, stripes: [[1.2, 1.45, '#ffffff']] }),
+    'citrus': S('Citrus', 'Creatief', { band: '#ff7a00', left: '#f4ffd1', right: '#ffe066', ink: '#1a1300',
+      zones: { left: xg('#f4ffd1', '#fffbd0'), right: yg('#ffe066', '#ffb347') }, stripes: [[1.61, 1.86, '#7ac943']] }),
+    'pastel-duo': S('Pastel duo', 'Creatief', { band: '#ff8fab', left: '#ffd6e0', right: '#cfe7ff', ink: '#1b1b1b', bandR: 0.8, bandRc: '#7fb8ff' })
   };
 
   ['heel-zomer', 'heel-lagune', 'heel-roos', 'heel-nacht'].forEach(function (k) { STYLES[k].fullFill = true; });
@@ -620,8 +669,21 @@ var Engine = (function () {
       var mode = ['solid', 'x', 'y', 'xy'].indexOf(p.mode) > -1 ? p.mode : 'solid';
       var c = (p.c || []).slice(0, 4);
       while (c.length < 4) c.push(c[0] || '#ffffff');
-      out.zones[z] = { mode: mode, c: c.map(function (x) { return isHex(x) ? x : '#ffffff'; }) };
+      var zo = { mode: mode, c: c.map(function (x) { return isHex(x) ? x : '#ffffff'; }) };
+      // verloop langs het label met meer dan twee kleuren: stops = [[0..1, kleur], ...]
+      if (mode === 'y' && Array.isArray(p.stops)) {
+        var st = p.stops.filter(function (q) { return Array.isArray(q) && isFinite(Number(q[0])) && isHex(q[1]); })
+          .map(function (q) { return [clamp(Number(q[0]), 0, 1), q[1]]; })
+          .sort(function (a, b) { return a[0] - b[0]; }).slice(0, 8);
+        if (st.length > 2) { zo.stops = st; zo.c = [st[0][1], st[0][1], st[st.length - 1][1], st[st.length - 1][1]]; }
+      }
+      out.zones[z] = zo;
     });
+    // smalle sierstrepen over de volle lengte (u in mm vanaf de linkerrand)
+    out.stripes = (Array.isArray(s.stripes) ? s.stripes : []).slice(0, 8).map(function (t) {
+      var a = clamp(num(t && t.u0, 0), 0, 40), b = clamp(num(t && t.u1, a + 0.4), 0, 40);
+      return { u0: Math.min(a, b), u1: Math.max(a, b), c: isHex(t && t.c) ? t.c : '#111111' };
+    }).filter(function (t) { return t.u1 - t.u0 >= 0.05; });
     var o = s.outline || {};
     out.outline = { on: !!o.on, width: clamp(num(o.width, 0.4), 0.05, 3), color: isHex(o.color) ? o.color : '#111111',
       pos: ['in', 'center', 'out'].indexOf(o.pos) > -1 ? o.pos : 'in' };
@@ -1008,6 +1070,7 @@ var Engine = (function () {
     if (paint.mode === 'solid')
       return { fill: paint.c[0], contours: [mapContour(polyCmds(rectLocal(z.u0, z.u1, v0, v1)), T)] };
     var K = corners(paint);
+    var STOPS = paint.mode === 'y' && paint.stops ? paint.stops.map(function (q) { return [q[0], hexRGB(q[1])]; }) : null;
     var cols = [z.u0];
     if (paint.mode !== 'y') { if (z.ua > z.u0 + 1e-6) cols.push(z.ua); if (z.ub < z.u1 - 1e-6 && z.ub > z.ua) cols.push(z.ub); }
     cols.push(z.u1);
@@ -1016,9 +1079,24 @@ var Engine = (function () {
     var n = Math.max(1, Math.ceil(ring.length / step));
     for (var i = 1; i < n; i++) rows.push(ring.top + ring.length * i / n);
     rows.push(ring.bottom, v1);
+    if (STOPS) {
+      STOPS.forEach(function (q) { rows.push(ring.top + ring.length * q[0]); });
+      rows.sort(function (a, b) { return a - b; });
+      rows = rows.filter(function (v, i) { return i === 0 || v - rows[i - 1] > 1e-6; });
+    }
     var span = Math.max(1e-6, z.ub - z.ua);
     function colorAt(u, v) {
       var s = clamp((u - z.ua) / span, 0, 1), t = clamp((v - ring.top) / ring.length, 0, 1);
+      if (STOPS) {
+        if (t <= STOPS[0][0]) return STOPS[0][1].slice();
+        for (var i = 1; i < STOPS.length; i++) {
+          if (t <= STOPS[i][0]) {
+            var a = STOPS[i - 1], b = STOPS[i], f = (t - a[0]) / Math.max(1e-6, b[0] - a[0]);
+            return [0, 1, 2].map(function (k) { return a[1][k] + (b[1][k] - a[1][k]) * f; });
+          }
+        }
+        return STOPS[STOPS.length - 1][1].slice();
+      }
       return [0, 1, 2].map(function (k) {
         var top = K[0][k] + (K[1][k] - K[0][k]) * s, bot = K[2][k] + (K[3][k] - K[2][k]) * s;
         return top + (bot - top) * t;
@@ -1027,7 +1105,7 @@ var Engine = (function () {
     var mesh = rows.map(function (v) {
       return cols.map(function (u) { var p = T(u, v), c = colorAt(u, v); return [p[0], p[1], c[0], c[1], c[2]]; });
     });
-    return { mesh: mesh, mode: paint.mode };
+    return { mesh: mesh, mode: paint.mode, stops: !!STOPS };
   }
 
   // ---------- strook opbouwen ----------
@@ -1040,6 +1118,10 @@ var Engine = (function () {
     var outline = mapContour(polyCmds(outlineLocal(ring)), T);
     var zg = zoneGeom(style, ring);
     zg.zones.forEach(function (z) { if (!z.skip) items.push(zoneItem(z, style.zones[z.key], ring, T)); });
+    style.stripes.forEach(function (sp) {
+      if (sp.u0 >= W) return;
+      items.push({ fill: sp.c, contours: [mapContour(polyCmds(rectLocal(sp.u0, Math.min(sp.u1, W + 1), ring.top - 1, ring.bottom + 1)), T)] });
+    });
 
     var tickShort = zg.bandL + L.tickPastBand, labelX = zg.bandL + L.labelPastBand;
     var rEdge = W - Math.max(L.rightMargin, zg.bandR + 0.6);
@@ -1310,7 +1392,7 @@ var Engine = (function () {
     }
     function same(a, b) { return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 0.004; }
     if (it.mode === 'y') {
-      var CH = 8;
+      var CH = it.stops ? 1 : 8;
       for (var r0 = 0; r0 < R - 1; r0 += CH) {
         var r1 = Math.min(R - 1, r0 + CH);
         var tA = M[r0][0], tB = M[r0][C - 1], bA = M[r1][0], bB = M[r1][C - 1];
@@ -1801,12 +1883,17 @@ function render() {
 function chipFor(style) {
   var c = el('span', 'chip'), s = Engine.normalizeStyle(style), W = 19.39;
   var g = Engine.zoneGeom(s, P.profiles && P.profiles.length ? ringOf(activeFolder()) : Engine.ringFor({}));
-  [['bandL', g.bandL], ['left', g.split - g.bandL], ['right', W - g.split - g.bandR], ['bandR', g.bandR]].forEach(function (z) {
+  [['bandL', g.bandL], ['left', (g.full ? W - g.bandR : g.split) - g.bandL], ['right', g.full ? 0 : W - g.split - g.bandR], ['bandR', g.bandR]].forEach(function (z) {
     if (z[1] <= 0) return;
     var sp = el('span'), p = s.zones[z[0]];
     sp.style.width = (z[1] / W * 100) + '%';
-    sp.style.background = p.mode === 'solid' ? p.c[0] : p.mode === 'x' ? 'linear-gradient(90deg,' + p.c[0] + ',' + p.c[1] + ')' : p.mode === 'y' ? 'linear-gradient(180deg,' + p.c[0] + ',' + p.c[2] + ')' : 'linear-gradient(135deg,' + p.c[0] + ',' + p.c[3] + ')';
+    sp.style.background = p.mode === 'solid' ? p.c[0] : p.mode === 'x' ? 'linear-gradient(90deg,' + p.c[0] + ',' + p.c[1] + ')'
+      : p.mode === 'y' ? 'linear-gradient(180deg,' + (p.stops ? p.stops.map(function (q) { return q[1] + ' ' + Math.round(q[0] * 100) + '%'; }).join(',') : p.c[0] + ',' + p.c[2]) + ')'
+      : 'linear-gradient(135deg,' + p.c[0] + ',' + p.c[3] + ')';
     c.appendChild(sp);
+  });
+  s.stripes.forEach(function (t) {
+    var i = el('i'); i.style.left = (t.u0 / W * 100) + '%'; i.style.width = Math.max(1, (t.u1 - t.u0) / W * 100) + '%'; i.style.background = t.c; c.appendChild(i);
   });
   return c;
 }
@@ -1944,7 +2031,7 @@ function renderStyle() {
   styleSliders.forEach(function (s) { s._show(); });
   $('fullFill').checked = !!f.style.fullFill;
   if (styleSliders[1]) styleSliders[1].hidden = !!f.style.fullFill;
-  renderZones(f);
+  renderZones(f); renderStripes(f);
   $('cInk').value = f.style.ink;
   var ol = f.style.outline;
   if (!$('olSliders')._built) {
@@ -1967,13 +2054,56 @@ function mix(a, b, t) {
   return '#' + pa.map(function (x, i) { var v = Math.round(x + (pb[i] - x) * t).toString(16); return v.length < 2 ? '0' + v : v; }).join('');
 }
 var zonesKey = '';
+var stripesKey = '';
+function r2(x) { return Math.round(x * 100) / 100; }
+function renderStripes(f) {
+  var box = $('stripes'), s = f.style;
+  if (!Array.isArray(s.stripes)) s.stripes = [];
+  var list = s.stripes, key = f.id + '|' + list.length;
+  if (key === stripesKey) {
+    list.forEach(function (t, i) {
+      var a = $('st_c_' + i), b = $('st_u_' + i), w = $('st_w_' + i);
+      if (a && a.value !== t.c) a.value = t.c;
+      if (b && document.activeElement !== b) b.value = r2(t.u0);
+      if (w && document.activeElement !== w) w.value = r2(t.u1 - t.u0);
+    });
+    return;
+  }
+  stripesKey = key; box.textContent = '';
+  list.forEach(function (t, i) {
+    var row = el('div', 'stripe');
+    function field(label, inp) { var l = el('label'); l.appendChild(document.createTextNode(label)); l.appendChild(inp); row.appendChild(l); return inp; }
+    var c = document.createElement('input'); c.type = 'color'; c.id = 'st_c_' + i; c.value = t.c; c.setAttribute('aria-label', 'Kleur van streep ' + (i + 1));
+    field('Kleur', c).addEventListener('input', function () { t.c = c.value; mark(); changed(); });
+    var u = document.createElement('input'); u.type = 'number'; u.className = 'inp'; u.id = 'st_u_' + i; u.step = '0.05'; u.min = '0'; u.max = '19'; u.value = r2(t.u0);
+    field('Vanaf rand (mm)', u).addEventListener('input', function () { var v = Number(u.value); if (!isFinite(v)) return; var w = t.u1 - t.u0; t.u0 = Math.max(0, Math.min(19, v)); t.u1 = t.u0 + w; mark(); changed(); });
+    var w = document.createElement('input'); w.type = 'number'; w.className = 'inp'; w.id = 'st_w_' + i; w.step = '0.05'; w.min = '0.05'; w.max = '6'; w.value = r2(t.u1 - t.u0);
+    field('Breedte (mm)', w).addEventListener('input', function () { var v = Number(w.value); if (!isFinite(v) || v < 0.05) return; t.u1 = t.u0 + Math.min(6, v); mark(); changed(); });
+    var x = el('button', 'iconbtn', '×'); x.type = 'button'; x.title = 'Streep weghalen'; x.setAttribute('aria-label', 'Streep ' + (i + 1) + ' weghalen');
+    x.onclick = function () { list.splice(i, 1); stripesKey = ''; mark(); changed(); };
+    row.appendChild(x);
+    box.appendChild(row);
+  });
+}
+$('btnAddStripe').onclick = function () {
+  var f = activeFolder(); if (!f) return;
+  var s = f.style; if (!Array.isArray(s.stripes)) s.stripes = [];
+  if (s.stripes.length >= 8) return;
+  var last = s.stripes.reduce(function (m, t) { return Math.max(m, t.u1); }, Number(s.bandL) || 0);
+  var u0 = r2(Math.min(18.5, last + (s.stripes.length ? 0.3 : 0.25)));
+  s.stripes.push({ u0: u0, u1: r2(u0 + 0.3), c: s.ink || '#111111' });
+  stripesKey = ''; mark(); changed();
+};
 function renderZones(f) {
   var box = $('zones'), s = f.style;
   var vis = Engine.ZONES.filter(function (z) { return z === 'left' || (z === 'right' && !s.fullFill) || (z === 'bandL' ? s.bandL > 0 : z === 'bandR' ? s.bandR > 0 : false); });
-  var key = f.id + '|' + (s.fullFill ? 'full' : 'split') + '|' + vis.join(',') + '|' + vis.map(function (z) { return s.zones[z].mode; }).join(',');
+  var key = f.id + '|' + (s.fullFill ? 'full' : 'split') + '|' + vis.join(',') + '|' + vis.map(function (z) { return s.zones[z].mode + (s.zones[z].stops ? s.zones[z].stops.length : ''); }).join(',');
   var focusId = document.activeElement && document.activeElement.id;
   if (key === zonesKey) { // alleen waarden bijwerken (houdt kleurkiezer open)
-    vis.forEach(function (z) { s.zones[z].c.forEach(function (c, i) { var inp = $('zc_' + z + '_' + i); if (inp && inp.value !== c) inp.value = c; }); });
+    vis.forEach(function (z) {
+      s.zones[z].c.forEach(function (c, i) { var inp = $('zc_' + z + '_' + i); if (inp && inp.value !== c) inp.value = c; });
+      (s.zones[z].stops || []).forEach(function (q, i) { var inp = $('zc_' + z + '_s' + i); if (inp && inp.value !== q[1]) inp.value = q[1]; });
+    });
     return;
   }
   zonesKey = key; box.textContent = '';
@@ -1987,6 +2117,7 @@ function renderZones(f) {
     });
     selm.value = p.mode;
     selm.onchange = function () {
+      delete p.stops;
       var m = selm.value, c0 = p.c[0], light = mix(c0, '#ffffff', 0.65);
       if (m === 'solid') p.c = [c0, c0, c0, c0];
       else if (p.mode === 'solid') p.c = m === 'x' ? [c0, light, c0, light] : m === 'y' ? [c0, c0, light, light] : [c0, light, light, c0];
@@ -1997,6 +2128,21 @@ function renderZones(f) {
     row.appendChild(selm);
     var cols = el('div', 'cols' + (p.mode === 'xy' ? ' grid4' : ''));
     var slots = p.mode === 'solid' ? [[0, 'Kleur']] : p.mode === 'x' ? [[0, 'Links'], [1, 'Rechts']] : p.mode === 'y' ? [[0, 'Boven'], [2, 'Onder']] : [[0, 'Linksboven'], [1, 'Rechtsboven'], [2, 'Linksonder'], [3, 'Rechtsonder']];
+    if (p.mode === 'y' && p.stops) {
+      var nS = p.stops.length;
+      p.stops.forEach(function (q, i) {
+        var lab = el('label', 'c'); lab.appendChild(document.createTextNode(i === 0 ? 'Boven' : i === nS - 1 ? 'Onder' : String(i + 1)));
+        var inp = document.createElement('input'); inp.type = 'color'; inp.id = 'zc_' + z + '_s' + i; inp.value = q[1];
+        inp.setAttribute('aria-label', ZONE_NAMES[z] + ' kleur ' + (i + 1));
+        inp.addEventListener('input', function () {
+          p.stops[i][1] = inp.value;
+          var a = p.stops[0][1], b = p.stops[p.stops.length - 1][1]; p.c = [a, a, b, b];
+          mark(); changed();
+        });
+        lab.appendChild(inp); cols.appendChild(lab);
+      });
+      slots = [];
+    }
     slots.forEach(function (sl, k) {
       var lab = el('label', 'c'); lab.appendChild(document.createTextNode(sl[1]));
       var inp = document.createElement('input'); inp.type = 'color'; inp.id = 'zc_' + z + '_' + sl[0]; inp.value = p.c[sl[0]];
@@ -2015,12 +2161,39 @@ function renderZones(f) {
     if (p.mode !== 'solid') {
       var sw = el('button', 'iconbtn', '⇄'); sw.type = 'button'; sw.title = 'Verloop omdraaien'; sw.setAttribute('aria-label', 'Verloop omdraaien voor ' + ZONE_NAMES[z]);
       sw.onclick = function () {
-        if (p.mode === 'x') p.c = [p.c[1], p.c[0], p.c[3], p.c[2]];
+        if (p.stops) { p.stops = p.stops.map(function (q) { return [Math.round((1 - q[0]) * 1000) / 1000, q[1]]; }).reverse(); p.c = [p.stops[0][1], p.stops[0][1], p.stops[p.stops.length - 1][1], p.stops[p.stops.length - 1][1]]; }
+        else if (p.mode === 'x') p.c = [p.c[1], p.c[0], p.c[3], p.c[2]];
         else if (p.mode === 'y') p.c = [p.c[2], p.c[3], p.c[0], p.c[1]];
         else p.c = [p.c[3], p.c[2], p.c[1], p.c[0]];
         mark(); zonesKey = ''; changed();
       };
       cols.appendChild(sw);
+    }
+    if (p.mode === 'y') {
+      var sb = el('span', 'stopbtns');
+      var add = el('button', 'iconbtn', '+'); add.type = 'button'; add.title = 'Kleur toevoegen aan het verloop'; add.setAttribute('aria-label', 'Kleur toevoegen aan het verloop van ' + ZONE_NAMES[z]);
+      add.onclick = function () {
+        var st = p.stops ? p.stops.slice() : [[0, p.c[0]], [1, p.c[2]]];
+        if (st.length >= 8) return;
+        var gi = 0, gw = -1;
+        for (var i = 1; i < st.length; i++) if (st[i][0] - st[i - 1][0] > gw) { gw = st[i][0] - st[i - 1][0]; gi = i; }
+        st.splice(gi, 0, [Math.round((st[gi - 1][0] + st[gi][0]) / 2 * 1000) / 1000, mix(st[gi - 1][1], st[gi][1], 0.5)]);
+        // gelijk verdelen
+        p.stops = st.map(function (q, i) { return [Math.round(i / (st.length - 1) * 1000) / 1000, q[1]]; });
+        mark(); zonesKey = ''; changed();
+      };
+      sb.appendChild(add);
+      if (p.stops) {
+        var rem = el('button', 'iconbtn', '−'); rem.type = 'button'; rem.title = 'Middelste kleur weghalen'; rem.setAttribute('aria-label', 'Kleur weghalen uit het verloop van ' + ZONE_NAMES[z]);
+        rem.onclick = function () {
+          var st = p.stops.slice(); st.splice(Math.floor(st.length / 2), 1);
+          if (st.length <= 2) { delete p.stops; p.c = [st[0][1], st[0][1], st[st.length - 1][1], st[st.length - 1][1]]; }
+          else p.stops = st.map(function (q, i) { return [Math.round(i / (st.length - 1) * 1000) / 1000, q[1]]; });
+          mark(); zonesKey = ''; changed();
+        };
+        sb.appendChild(rem);
+      }
+      cols.appendChild(sb);
     }
     row.appendChild(cols);
     box.appendChild(row);
@@ -2907,7 +3080,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '23 · 13-10-2026 · eigen mal voor de Tilta ARRI-ring';
+var APP_VERSION = '24 · 13-10-2026 · creatieve stijlen, meerkleurig verloop, sierstrepen';
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
