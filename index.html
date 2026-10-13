@@ -100,6 +100,9 @@ input[type=checkbox], input[type=radio] { accent-color: var(--accent); }
 .linkbtn { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .jigimg { display: block; width: 100%; height: auto; border-radius: var(--r); background: #24483e; }
 a.btn { text-decoration: none; }
+.savedlist { display: flex; flex-direction: column; gap: 8px; }
+.saved { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.saved .chip { width: 28px; height: 24px; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; font-size: 13px; color: var(--muted); }
 .keys dt { font: 600 13px/1.5 var(--font-ui); color: var(--ink); white-space: nowrap; }
 .keys dd { margin: 0; line-height: 1.5; }
@@ -416,12 +419,27 @@ details[open] summary { margin-bottom: 10px; }
           </div>
         </div>
       </details>
-      <section>
+      <section class="stack">
+        <div class="row"><button class="btn small" id="btnStyleSave" type="button">Opmaak bewaren…</button></div>
+        <form class="saveform stack" id="saveForm" hidden>
+          <label class="field"><span>Naam van deze opmaak</span>
+            <input class="inp" id="saveName" type="text" maxlength="40" placeholder="Bijvoorbeeld Dulens geel" autocomplete="off">
+          </label>
+          <p class="hint" id="saveHint"></p>
+          <div class="row">
+            <button class="btn small primary" type="submit">Bewaren</button>
+            <button class="btn small" type="button" id="saveCancel">Annuleren</button>
+          </div>
+        </form>
         <div class="row">
           <button class="btn small" id="btnStyleDefault" type="button">Maak standaard</button>
           <button class="btn small" id="btnStyleAll" type="button">Op alle mappen</button>
         </div>
       </section>
+      <details class="more" id="dSaved" hidden>
+        <summary>Bewaarde opmaak <span class="sumval" id="savedCount"></span></summary>
+        <div class="body"><div class="savedlist" id="savedList"></div></div>
+      </details>
     </div>
 
     <div class="pane" id="pane-ring" role="tabpanel" aria-labelledby="tab-ring" hidden>
@@ -1718,7 +1736,7 @@ function renderDefaults() {
   $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Maak standaard';
 }
 function defaults() {
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 17, profiles: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 17, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   var lens = Engine.parseLensFile(JSON.stringify(SAMPLE_TL), 'DULENS PL 85.tl');
   fileLens(lens);
@@ -1753,6 +1771,8 @@ function migrate(j) {
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
     var save3 = P; P = j; toV3(j); migr16(j); migr17(j); P = save3;
+    j.saved = (Array.isArray(j.saved) ? j.saved : []).filter(function (x) { return x && x.style; })
+      .map(function (x) { return { id: x.id || uid('s'), name: String(x.name || 'Opmaak').slice(0, 40), style: Engine.normalizeStyle(x.style) }; });
     return j;
   }
   // v1: één project zonder mappen
@@ -2049,8 +2069,10 @@ function renderStyle() {
     b.onclick = onClick;
     return b;
   }
-  var groups = [];
-  if (P.defaults && P.defaults.style) groups.push(['Mijn', [['mijn', 'Mijn standaard', P.defaults.style]]]);
+  var groups = [], mine = [];
+  if (P.defaults && P.defaults.style) mine.push(['mijn', 'Mijn standaard', P.defaults.style]);
+  (P.saved || []).forEach(function (x) { mine.push(['u:' + x.id, x.name, x.style]); });
+  if (mine.length) groups.push(['Mijn opmaak', mine]);
   Object.keys(Engine.STYLES).forEach(function (k) {
     var st = Engine.STYLES[k], g = st.group || 'Effen', grp = groups.filter(function (x) { return x[0] === g; })[0];
     if (!grp) { grp = [g, []]; groups.push(grp); }
@@ -2064,13 +2086,20 @@ function renderStyle() {
       sw.appendChild(swatch(it[1], st, f.styleKey === k, function () {
         var keep = clone(f.style.outline);
         f.style = Engine.normalizeStyle(clone(st));
-        if (k !== 'mijn') f.style.outline = keep;
-        f.styleKey = k; changed();
-      }, k === 'mijn'));
+        if (k !== 'mijn' && k.indexOf('u:') !== 0) f.style.outline = keep;
+        f.styleKey = k; f.styleBase = k.indexOf('u:') === 0 ? k.slice(2) : null; changed();
+      }, k === 'mijn' || k.indexOf('u:') === 0));
     });
     row.appendChild(sw); box.appendChild(row);
   });
-  var curName = f.styleKey === 'mijn' ? 'Mijn standaard' : (Engine.STYLES[f.styleKey] ? Engine.STYLES[f.styleKey].label : 'eigen opmaak');
+  if (f.styleKey === 'eigen' && (P.saved || []).length) { // gelijk aan een bewaarde opmaak? dan die naam tonen
+    var sg = styleSig(f.style), hit = P.saved.filter(function (x) { return styleSig(x.style) === sg; })[0];
+    if (hit) { f.styleKey = 'u:' + hit.id; f.styleBase = hit.id; }
+  }
+  var savedCur = savedById(String(f.styleKey).indexOf('u:') === 0 ? f.styleKey.slice(2) : '');
+  var baseCur = !savedCur && f.styleKey === 'eigen' ? savedById(f.styleBase) : null;
+  var curName = f.styleKey === 'mijn' ? 'Mijn standaard' : savedCur ? savedCur.name : baseCur ? baseCur.name + ', aangepast' : (Engine.STYLES[f.styleKey] ? Engine.STYLES[f.styleKey].label : 'eigen opmaak');
+  renderSaved();
   $('startLabel').textContent = 'Startpunt: ' + curName;
   var nStr = (f.style.stripes || []).length;
   $('stripeCount').textContent = nStr ? String(nStr) : '';
@@ -2648,6 +2677,66 @@ function syncAll() {
   $('pngDpi').value = String(P.pngDpi || 600);
   zonesKey = '';
 }
+// ---------- eigen opmaak bewaren ----------
+function savedById(id) { return (P.saved || []).filter(function (x) { return x.id === id; })[0]; }
+function savedByName(n) { n = String(n || '').trim().toLowerCase(); return (P.saved || []).filter(function (x) { return x.name.trim().toLowerCase() === n; })[0]; }
+var savedKey = '';
+function renderSaved() {
+  var list = P.saved || [], box = $('savedList');
+  $('dSaved').hidden = !list.length;
+  $('savedCount').textContent = list.length ? String(list.length) : '';
+  var f = activeFolder(), same = f && list.filter(function (x) { return styleSig(x.style) === styleSig(f.style); })[0];
+  $('btnStyleSave').textContent = same ? 'Bewaard als ' + same.name : 'Opmaak bewaren…';
+  $('btnStyleSave').disabled = !!same;
+  var key = list.map(function (x) { return x.id + ':' + styleSig(x.style).length; }).join('|');
+  if (key === savedKey) { list.forEach(function (x) { var i = $('sv_' + x.id); if (i && document.activeElement !== i && i.value !== x.name) i.value = x.name; }); return; }
+  savedKey = key; box.textContent = '';
+  list.forEach(function (x) {
+    var row = el('div', 'saved');
+    row.appendChild(chipFor(x.style));
+    var inp = document.createElement('input'); inp.className = 'inp'; inp.type = 'text'; inp.maxLength = 40; inp.id = 'sv_' + x.id; inp.value = x.name;
+    inp.setAttribute('aria-label', 'Naam van bewaarde opmaak');
+    inp.addEventListener('input', function () { x.name = inp.value.trim() || x.name; persist(); renderFolders(); var f2 = activeFolder(); if (f2 && f2.styleKey === 'u:' + x.id) $('startLabel').textContent = 'Startpunt: ' + x.name; });
+    inp.addEventListener('blur', function () { inp.value = x.name; renderStyle(); });
+    row.appendChild(inp);
+    var del = el('button', 'iconbtn', '×'); del.type = 'button'; del.title = 'Verwijderen'; del.setAttribute('aria-label', x.name + ' verwijderen');
+    del.onclick = function () {
+      var i = P.saved.indexOf(x); if (i < 0) return;
+      P.saved.splice(i, 1);
+      P.folders.forEach(function (fo) { if (fo.styleKey === 'u:' + x.id) fo.styleKey = 'eigen'; });
+      savedKey = ''; changed();
+      toast(x.name + ' verwijderd', { action: { label: 'Ongedaan maken', run: function () { P.saved.splice(i, 0, x); savedKey = ''; changed(); } }, ms: 6000 });
+    };
+    row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+function saveHint() {
+  var ex = savedByName($('saveName').value);
+  $('saveHint').textContent = ex ? 'Vervangt de bewaarde opmaak ' + ex.name + '.' : 'Komt bij de startpunten onder Mijn opmaak, en gaat mee in je bibliotheek.';
+}
+$('btnStyleSave').onclick = function () {
+  var f = activeFolder(); if (!f) return;
+  var cur = savedById(String(f.styleKey).indexOf('u:') === 0 ? f.styleKey.slice(2) : '') || savedById(f.styleBase);
+  $('saveName').value = cur ? cur.name : '';
+  $('saveForm').hidden = false; $('btnStyleSave').hidden = true; saveHint();
+  $('saveName').focus(); $('saveName').select();
+};
+$('saveName').addEventListener('input', saveHint);
+function closeSave() { $('saveForm').hidden = true; $('btnStyleSave').hidden = false; }
+$('saveCancel').onclick = closeSave;
+$('saveName').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeSave(); } });
+$('saveForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var f = activeFolder(); if (!f) return;
+  P.saved = P.saved || [];
+  var name = $('saveName').value.trim() || ('Opmaak ' + (P.saved.length + 1));
+  var ex = savedByName(name), st = Engine.normalizeStyle(clone(f.style));
+  if (ex) { ex.style = st; f.styleKey = 'u:' + ex.id; f.styleBase = ex.id; toast(ex.name + ' bijgewerkt'); }
+  else { var item = { id: uid('s'), name: name, style: st }; P.saved.push(item); f.styleKey = 'u:' + item.id; f.styleBase = item.id; toast('Bewaard als ' + name + '. Je vindt hem bij de startpunten onder Mijn opmaak.', { ms: 5000 }); }
+  savedKey = ''; closeSave(); changed();
+});
+
 $('btnStyleDefault').onclick = function () {
   var f = activeFolder(); if (!f) return;
   P.defaults = P.defaults || {};
@@ -3144,7 +3233,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '26 · 13-10-2026 · zwart-wit';
+var APP_VERSION = '27 · 13-10-2026 · eigen opmaak bewaren';
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
