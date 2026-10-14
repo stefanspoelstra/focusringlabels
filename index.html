@@ -505,7 +505,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
               <option value="2">2 stickers (voor- en achterdop)</option>
             </select>
           </label>
-          <p class="hint">In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Ze komen op een eigen vel na de stroken. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking niet opvalt. Helemaal rond gaat het snelst met een cirkelpons van dezelfde maat.</p>
+          <p class="hint">In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Passen ze naast de stroken, dan komen ze op hetzelfde vel; anders op een eigen vel. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking niet opvalt. Helemaal rond gaat het snelst met een cirkelpons van dezelfde maat.</p>
         </div>
       </section>
       <details class="more" id="dZones">
@@ -1669,8 +1669,8 @@ var Engine = (function () {
     items.push({ fill: style.ink, contours: shapes });
     return { clip: clip, cut: cut, items: items };
   }
-  function buildCapPages(job, opts) {
-    opts = opts || {};
+  // instellingen voor de lensdoppen uit de opdracht van een map
+  function capConfig(job) {
     var style = normalizeStyle(job.style), ol = style.outline;
     var D = clamp(Number(job.capD) || 40, 15, 120), per = Number(job.capCount) === 2 ? 2 : 1;
     // afronding 0..100 (%): 0 = vierkant, 100 = rond; oudere instelling 'shape' telt nog mee
@@ -1681,39 +1681,85 @@ var Engine = (function () {
     var bleed = !ol.on && gap >= 2 ? Math.min(1, gap / 2 - 0.5) : 0;
     var list = [];
     (job.lenses || []).filter(function (l) { return l.include !== false; }).forEach(function (l) { for (var i = 0; i < per; i++) list.push(l); });
-    if (!list.length) return [];
-    var top = 22, bottom = 274;
-    var cols = Math.max(1, Math.floor((210 - 2 * PAGE.firstX + gap) / (D + gap)));
-    var rows = Math.max(1, Math.floor((bottom - top + gap) / (D + gap)));
+    return { style: style, ol: ol, D: D, round: round, gap: gap, bleed: bleed, list: list, lensText: job.lensText !== false, topExtra: job.topExtra !== false };
+  }
+  function capSizeTxt(cfg) { return (cfg.round >= 1 ? 'Ø ' + fmt(cfg.D, 1) : fmt(cfg.D, 1) + ' × ' + fmt(cfg.D, 1)) + ' MM'; }
+  function capHowTxt(cfg) {
+    var how = cfg.gap < 0.5 && cfg.round === 0 ? say('SNIJ LANGS DE LIJNEN: EERST DE LANGE SNEDEN, DAN DE KORTE', 'CUT ALONG THE LINES: LONG CUTS FIRST, THEN THE SHORT ONES')
+      : cfg.round >= 1 ? say('KNIP LANGS DE GRIJZE LIJN, OF GEBRUIK EEN CIRKELPONS VAN DEZE MAAT', 'CUT ALONG THE GREY LINE, OR USE A CIRCLE PUNCH OF THIS SIZE')
+      : say('SNIJ LANGS DE GRIJZE LIJN', 'CUT ALONG THE GREY LINE');
+    return how;
+  }
+  // één sticker op een vel zetten (met omlijning of snijlijn); cap: true zodat de app weet dat het geen strook is
+  function placeCap(page, lens, cx, cy, cfg) {
+    var cap = buildCap(lens, cfg.style, cx, cy, cfg.D, { lensText: cfg.lensText, topExtra: cfg.topExtra, round: cfg.round, bleed: cfg.bleed });
+    var ol = cfg.ol, citems = cap.items.slice();
+    if (ol.on && ol.pos === 'out') page.items.push({ stroke: ol.color, width: ol.width * 2, contours: [cap.cut] });
+    if (ol.on && ol.pos === 'in') citems.push({ stroke: ol.color, width: ol.width * 2, contours: [cap.cut] });
+    page.items.push({ clip: cap.clip, items: citems, lensId: lens.id, cap: true });
+    if (ol.on && ol.pos === 'center') page.items.push({ stroke: ol.color, width: ol.width, contours: [cap.cut] });
+    if (!ol.on) page.items.push({ stroke: cfg.bleed > 0 ? '#7a7a7a' : '#bbbbbb', width: 0.1, contours: [cap.cut] });   // snijlijn
+  }
+  // stickers in een rechthoek [x0, x1] × [y0, y1] zetten; geeft terug hoeveel er pasten
+  function fillCaps(page, list, cfg, x0, x1, y0, y1, center) {
+    var D = cfg.D, gap = cfg.gap;
+    var cols = Math.floor((x1 - x0 + gap) / (D + gap)), rows = Math.floor((y1 - y0 + gap) / (D + gap));
+    if (cols < 1 || rows < 1) return 0;
+    var nFit = Math.min(list.length, cols * rows);
+    var left = center ? x0 + ((x1 - x0) - (cols * D + (cols - 1) * gap)) / 2 : x0;
+    for (var i = 0; i < nFit; i++) {
+      var c = i % cols, r = Math.floor(i / cols);
+      placeCap(page, list[i], left + D / 2 + c * (D + gap), y0 + D / 2 + r * (D + gap), cfg);
+    }
+    return nFit;
+  }
+  function capPages(list, cfg, job, opts) {
+    var top = 22, bottom = 274, pages = [];
+    var cols = Math.max(1, Math.floor((210 - 2 * PAGE.firstX + cfg.gap) / (cfg.D + cfg.gap)));
+    var rows = Math.max(1, Math.floor((bottom - top + cfg.gap) / (cfg.D + cfg.gap)));
     var perPage = cols * rows, n = Math.ceil(list.length / perPage);
-    var left = (210 - (cols * D + (cols - 1) * gap)) / 2;
-    var pages = [];
     for (var p = 0; p < n; p++) {
       var page = { items: [], strips: [], caps: true }, shapes = [];
-      var hdr = [job.name || 'Ringlabels', say('LENSDOPPEN', 'LENS CAPS'), (round >= 1 ? 'Ø ' + fmt(D, 1) : fmt(D, 1) + ' × ' + fmt(D, 1)) + ' MM', opts.date || '', n > 1 ? say('VEL ', 'SHEET ') + (p + 1) + '/' + n : '']
+      var hdr = [job.name || 'Ringlabels', say('LENSDOPPEN', 'LENS CAPS'), capSizeTxt(cfg), opts.date || '', n > 1 ? say('VEL ', 'SHEET ') + (p + 1) + '/' + n : '']
         .filter(Boolean).join('   ·   ').toUpperCase();
       shapes.push(textContours(hdr, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 12 - fy]; }));
-      var how = gap < 0.5 && round === 0 ? say('SNIJ LANGS DE LIJNEN: EERST DE LANGE SNEDEN, DAN DE KORTE', 'CUT ALONG THE LINES: LONG CUTS FIRST, THEN THE SHORT ONES')
-        : round >= 1 ? say('KNIP LANGS DE GRIJZE LIJN, OF GEBRUIK EEN CIRKELPONS VAN DEZE MAAT', 'CUT ALONG THE GREY LINE, OR USE A CIRCLE PUNCH OF THIS SIZE')
-        : say('SNIJ LANGS DE GRIJZE LIJN', 'CUT ALONG THE GREY LINE');
-      if (bleed > 0) how += say('   ·   DE KLEUR LOOPT ' + fmt(bleed, 1) + ' MM DOOR, ZODAT EEN KLEINE AFWIJKING NIET OPVALT', '   ·   THE COLOUR RUNS ' + fmt(bleed, 1) + ' MM PAST IT, SO A SMALL MISS DOES NOT SHOW');
+      var how = capHowTxt(cfg);
+      if (cfg.bleed > 0) how += say('   ·   DE KLEUR LOOPT ' + fmt(cfg.bleed, 1) + ' MM DOOR, ZODAT EEN KLEINE AFWIJKING NIET OPVALT', '   ·   THE COLOUR RUNS ' + fmt(cfg.bleed, 1) + ' MM PAST IT, SO A SMALL MISS DOES NOT SHOW');
       shapes.push(textContours(how, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 15.2 - fy]; }));
       rulerShapes(shapes);
       page.items.push({ fill: '#222222', contours: shapes });
-      list.slice(p * perPage, (p + 1) * perPage).forEach(function (lens, i) {
-        var c = i % cols, rI = Math.floor(i / cols);
-        var cx = left + D / 2 + c * (D + gap), cy = top + D / 2 + rI * (D + gap);
-        var cap = buildCap(lens, style, cx, cy, D, { lensText: job.lensText !== false, topExtra: job.topExtra !== false, round: round, bleed: bleed });
-        var citems = cap.items.slice();
-        if (ol.on && ol.pos === 'out') page.items.push({ stroke: ol.color, width: ol.width * 2, contours: [cap.cut] });
-        if (ol.on && ol.pos === 'in') citems.push({ stroke: ol.color, width: ol.width * 2, contours: [cap.cut] });
-        page.items.push({ clip: cap.clip, items: citems, lensId: lens.id });
-        if (ol.on && ol.pos === 'center') page.items.push({ stroke: ol.color, width: ol.width, contours: [cap.cut] });
-        if (!ol.on) page.items.push({ stroke: bleed > 0 ? '#7a7a7a' : '#bbbbbb', width: 0.1, contours: [cap.cut] });   // snijlijn
-      });
+      var chunk = list.slice(p * perPage, (p + 1) * perPage);
+      fillCaps(page, chunk, cfg, PAGE.firstX, 210 - PAGE.firstX, top, bottom, true);
       pages.push(page);
     }
     return pages;
+  }
+  function buildCapPages(job, opts) {
+    var cfg = capConfig(job);
+    return cfg.list.length ? capPages(cfg.list, cfg, job, opts || {}) : [];
+  }
+  // stroken plus lensdoppen: wat past, komt naast de stroken op het laatste vel; de rest op eigen vellen
+  function buildSheets(job, opts) {
+    opts = opts || {};
+    var pages = buildPages(job, opts);
+    if (!job.caps) return pages;
+    var cfg = capConfig(job), list = cfg.list;
+    if (!list.length) return pages;
+    var last = pages[pages.length - 1];
+    if (last && last.strips.length) {
+      var st = last.strips[last.strips.length - 1], ring = st.ring;
+      var x0 = st.x0 + ring.W + 6, x1 = 210 - PAGE.firstX, y0 = 22, y1 = 274;
+      var nFit = fillCaps(last, list, cfg, x0, x1, y0, y1, false);
+      if (nFit) {
+        last.capsIn = nFit;
+        // korte uitleg boven de stickers, passend in de vrije ruimte
+        var t = say('LENSDOPPEN', 'LENS CAPS') + '  ·  ' + capSizeTxt(cfg) + '  ·  ' + capHowTxt(cfg), cap = 1.6, tw = textWidth(t, 400, cap, 0.1);
+        if (tw > x1 - x0) { cap *= (x1 - x0) / tw; }
+        last.items.push({ fill: '#222222', contours: [textContours(t, 400, cap, 0.1, function (fx, fy) { return [x0 + fx, 19.6 - fy]; })] });
+        list = list.slice(nFit);
+      }
+    }
+    return list.length ? pages.concat(capPages(list, cfg, job, opts)) : pages;
   }
 
   function buildPages(job, opts) {
@@ -1941,7 +1987,7 @@ var Engine = (function () {
         if (it.clip) {
           var c = id + 'c' + (cid++);
           out.push('<clipPath id="' + c + '"><path d="' + dOf([it.clip]) + '"/></clipPath>');
-          out.push('<g clip-path="url(#' + c + ')"' + (it.lensId ? ' data-lens="' + it.lensId + '"' : '') + '>');
+          out.push('<g clip-path="url(#' + c + ')"' + (it.lensId ? ' data-lens="' + it.lensId + '"' : '') + (it.cap ? ' data-cap="1"' : '') + '>');
           emit(it.items);
           out.push('</g>');
           if (opts.highlight && it.lensId === opts.highlight)
@@ -2080,7 +2126,7 @@ var Engine = (function () {
     layoutLens: layoutLens, buildStrip: buildStrip, buildPages: buildPages,
     pageSVG: pageSVG, buildPDF: buildPDF, textWidth: textWidth, distOf: distOf, buildCalibPages: buildCalibPages,
     setLang: setLang, lang: function () { return LANG; }, cornerRadii: cornerRadii,
-    distText: distText, measuredPts: measuredPts, buildCapPages: buildCapPages
+    distText: distText, measuredPts: measuredPts, buildCapPages: buildCapPages, buildSheets: buildSheets
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
@@ -2142,14 +2188,15 @@ var I18N = (function () {
     'Lensnaam onderaan': 'Lens name at the bottom',
     'T-stop bovenaan': 'T-stop at the top',
     'Lensdoppen': 'Lens caps',
+    'lensdoppen op hetzelfde vel': 'lens caps on the same sheet',
     'Stickers voor de lensdoppen meeprinten': 'Also print stickers for the lens caps',
     'Doorsnede': 'Diameter',
     'van de sticker': 'of the sticker',
     'Per lens': 'Per lens',
     '1 sticker': '1 sticker',
     '2 stickers (voor- en achterdop)': '2 stickers (front and rear cap)',
-    'In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Ze komen op een eigen vel na de stroken. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking niet opvalt. Helemaal rond gaat het snelst met een cirkelpons van dezelfde maat.':
-      'In the colours of the strips, with the focal length, T-stop and lens name (as ticked above). They go on their own sheet after the strips. With space between them the colour runs 1 mm past the cut line, so a small miss does not show. Fully round ones are quickest with a circle punch of the same size.',
+    'In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Passen ze naast de stroken, dan komen ze op hetzelfde vel; anders op een eigen vel. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking niet opvalt. Helemaal rond gaat het snelst met een cirkelpons van dezelfde maat.':
+      'In the colours of the strips, with the focal length, T-stop and lens name (as ticked above). If they fit next to the strips they go on the same sheet; otherwise on a sheet of their own. With space between them the colour runs 1 mm past the cut line, so a small miss does not show. Fully round ones are quickest with a circle punch of the same size.',
     'Afronding': 'Rounding',
     '0 = vierkant, 100 = rond': '0 = square, 100 = round',
     'Ruimte ertussen': 'Space between',
@@ -2526,6 +2573,7 @@ var I18N = (function () {
     [/^Andere lenzen schuiven mee met hun eigen ∞-waarde\. Een lagere waarde dan (.+) zet ∞ verder van de nudge\.$/, 'Other lenses shift with their own ∞ value. A value lower than $1 puts ∞ further from the nudge.'],
     [/^Referentie: (.+)\. De ∞-afstand geldt nu voor deze lens\.$/, 'Reference: $1. The ∞ distance now applies to this lens.'],
     [/^Deze map heeft nog geen lenzen op het vel\. Laad \.tl-bestanden of verplaats een lens naar (.+)\.$/, 'This folder has no lenses on the sheet yet. Load .tl files or move a lens to $1.'],
+    [/^lensdoppen deels op hetzelfde vel, de rest op (\d+) extra (vel|vellen)$/, function (m) { return 'lens caps partly on the same sheet, the rest on ' + m[1] + (m[2] === 'vel' ? ' extra sheet' : ' extra sheets'); }],
     [/^lensdoppen op (\d+) (vel|vellen)$/, function (m) { return 'lens caps on ' + m[1] + (m[2] === 'vel' ? ' sheet' : ' sheets'); }],
     [/^(\d+) (strook|stroken) op (\d+) (vel|vellen) A4$/, function (m) { return m[1] + (m[2] === 'strook' ? ' strip' : ' strips') + ' on ' + m[3] + (m[4] === 'vel' ? ' A4 sheet' : ' A4 sheets'); }],
     [/^Plak het meetlabel op de ring \(0 = (het midden|de bovenrand|de onderrand) van de nudge\)\. Lees af bij ∞ en bij een korte afstand op de lens\.$/,
@@ -3113,8 +3161,9 @@ function capsCfg() {
 function jobFor(f) { var c = capsCfg(); return { ring: ringRs(profileOf(f)), style: f.style, name: f.name, lenses: lensesOf(f.id), minors: P.minors !== false, lensText: P.lensText !== false, topExtra: P.topExtra !== false, capD: c.d, capCount: c.n, capRound: c.round, capGap: c.gap }; }
 function pagesFor(f) {
   if (!cache[f.id]) {
-    var job = jobFor(f), o = { date: today() };
-    cache[f.id] = Engine.buildPages(job, o).concat(capsCfg().on ? Engine.buildCapPages(job, o) : []);
+    var job = jobFor(f); job.caps = capsCfg().on;
+    // de app zoekt zelf ruimte: lensdoppen die passen komen naast de stroken op het laatste vel, de rest op een eigen vel
+    cache[f.id] = Engine.buildSheets(job, { date: today() });
   }
   return cache[f.id];
 }
@@ -3750,9 +3799,11 @@ function renderPages() {
   renderAnchorWarn(f, pg);
   $('pageInfo').textContent = '';
   $('pageInfo').appendChild(el('b', '', f.name));
-  var nCap = pg.filter(function (p) { return p.caps; }).length, nStrip = pg.length - nCap;
+  var nCap = pg.filter(function (p) { return p.caps; }).length, nStrip = pg.length - nCap, inSame = pg.some(function (p) { return p.capsIn; });
   $('pageInfo').appendChild(document.createTextNode(total + (total === 1 ? ' strook' : ' stroken') + ' op ' + nStrip + (nStrip === 1 ? ' vel A4' : ' vellen A4')));
-  if (nCap) $('pageInfo').appendChild(el('span', 'capinfo', 'lensdoppen op ' + nCap + (nCap === 1 ? ' vel' : ' vellen')));
+  if (inSame || nCap) $('pageInfo').appendChild(el('span', 'capinfo', inSame && !nCap ? 'lensdoppen op hetzelfde vel'
+    : inSame ? 'lensdoppen deels op hetzelfde vel, de rest op ' + nCap + (nCap === 1 ? ' extra vel' : ' extra vellen')
+    : 'lensdoppen op ' + nCap + (nCap === 1 ? ' vel' : ' vellen')));
   var hint = el('span', 'stagehint', 'Klik op een strook om hem te kiezen, sleep om de volgorde te veranderen'); $('pageInfo').appendChild(hint);
   var availW = sc.clientWidth - 12, sticky = window.innerWidth > 760;
   var base = sticky ? Math.min(availW, (sc.clientHeight - 12) * 210 / 297) : Math.min(availW, 640);
@@ -3775,7 +3826,7 @@ var SD = null, SD_JUST = false, sdScrollT = null, sdV = [0, 0];
 $('pages').addEventListener('pointerdown', function (e) {
   if (e.pointerType === 'touch' || e.button) return;   // op een aanraakscherm blijft vegen gewoon scrollen
   var g = e.target.closest && e.target.closest('[data-lens]'); if (!g) return;
-  if (g.closest('.capsheet')) return;   // lensdoppen: klikken kiest de lens, slepen niet
+  if (g.closest('.capsheet') || g.hasAttribute('data-cap')) return;   // lensdoppen: klikken kiest de lens, slepen niet
   e.preventDefault();
   SD = { id: g.getAttribute('data-lens'), g: g, x: e.clientX, y: e.clientY, on: false, target: null };
   document.addEventListener('pointermove', sdMove, { passive: false });
@@ -3797,7 +3848,7 @@ function sdMove(e) {
   e.preventDefault();
   // dichtstbijzijnde strook (niet de gesleepte): ervoor of erachter, naar waar de cursor staat
   var best = null, bd = Infinity;
-  Array.prototype.forEach.call(document.querySelectorAll('#pages [data-lens]'), function (s) {
+  Array.prototype.forEach.call(document.querySelectorAll('#pages [data-lens]:not([data-cap])'), function (s) {
     if (s === d.g) return;
     var r = s.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2);
     var dy = e.clientY < r.top ? r.top - e.clientY : e.clientY > r.bottom ? e.clientY - r.bottom : 0;
@@ -4856,7 +4907,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '45 · ' + (LANG === 'en' ? '2026-10-14 · lens caps: rounding and spacing' : '14-10-2026 · lensdoppen: afronding en ruimte');
+var APP_VERSION = '46 · ' + (LANG === 'en' ? '2026-10-14 · lens caps on the same sheet' : '14-10-2026 · lensdoppen op hetzelfde vel');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();

@@ -32,7 +32,7 @@ Voor een lens zonder `.tl`-bestand, of een ander follow-focussysteem dan de Nucl
 
 ## Lensdoppen
 
-Onder **Opmaak › Lensdoppen** print je ook ronde stickers voor je lensdoppen: het brandpunt groot, met de T-stop en de lensnaam, in dezelfde kleuren als de stroken van die map. Stel de afronding in (0 = vierkant, 100 = rond), de grootte (20 tot 100 mm), de ruimte ertussen en 1 of 2 stickers per lens (voor- en achterdop). Ze komen op een eigen vel na de stroken. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking bij het snijden niet opvalt; helemaal ronde stickers gaan het snelst met een cirkelpons van dezelfde maat.
+Onder **Opmaak › Lensdoppen** print je ook ronde stickers voor je lensdoppen: het brandpunt groot, met de T-stop en de lensnaam, in dezelfde kleuren als de stroken van die map. Stel de afronding in (0 = vierkant, 100 = rond), de grootte (20 tot 100 mm), de ruimte ertussen en 1 of 2 stickers per lens (voor- en achterdop). De app kijkt zelf of ze naast de stroken op het laatste vel passen; wat niet past, komt op een eigen vel. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking bij het snijden niet opvalt; helemaal ronde stickers gaan het snelst met een cirkelpons van dezelfde maat.
 
 ## Mal voor de Tilta ARRI-ring
 
