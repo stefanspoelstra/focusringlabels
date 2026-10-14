@@ -22,6 +22,10 @@ Een `.tl`-bestand zegt per afstand welke motorwaarde (0–10.000) erbij hoort, m
 
 **Originele Tilta-ring** (de kleinere ring die bij de Nucleus-M II zit): label 11 × 225 mm, dat begint tegen de onderkant van de nudge. Gemeten op de Dulens 21 mm: ∞ op 80,4 mm, schaal 21,88 mm per 1000 (24,5 × 225/252: hetzelfde wiel, een kleinere ring). De schaal loopt rond de nudge door, dus de korte afstanden staan bovenaan, en het brandpunt staat in het gat tussen de kortste afstand en ∞.
 
+## Lens inmeten (zonder lensbestand)
+
+Voor een lens zonder `.tl`-bestand, of een ander follow-focussysteem dan de Nucleus-M II: kies **Lens inmeten**. Print het meetlabel, plak het om de ring en lees per afstand op de lens af hoeveel mm hij van de nudge ligt. De app zet de streepjes precies op die plekken en rekent de tussenstreepjes ertussen uit (lineair in 1/afstand). Omdat je op de ring zelf meet, maken het systeem, de lensdata en de motorwaarden niet uit. De metingen horen wel bij de ring waarop je ze deed.
+
 ## Mal voor de Tilta ARRI-ring
 
 `mal/Focusringlabels_mal_Tilta-ARRI-ring.stl`: 3D-printbare mal om het label recht op de Tilta ARRI-ring te zetten. De nok past in de uitsparing van 4 × 3,3 mm. Print hem plat, zonder support, in PLA of PETG. Leg het label met de lijmkant boven in de goot en de uitsparing over de nok.

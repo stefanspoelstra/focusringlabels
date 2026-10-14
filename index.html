@@ -320,6 +320,21 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 .cal .res b { font: 600 18px/1.2 var(--font-cond); font-variant-numeric: tabular-nums; }
 .cal .res .warn { color: var(--warn); }
 .empty { color: var(--muted); font-size: 14px; margin: 0; }
+/* lens zelf inmeten */
+.measname { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 76px 92px; gap: 8px; }
+.measname .field { min-width: 0; }
+@media (max-width: 420px) { .measname { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.steps.small { margin: 0 0 8px; padding-left: 20px; font-size: 14px; line-height: 1.45; display: grid; gap: 4px; }
+.meas { border-collapse: collapse; font-size: 14px; }
+.meas th { text-align: left; font: 500 12.5px/1 var(--font-ui); color: var(--muted); padding: 0 6px 6px 0; border-bottom: 1px solid var(--line); }
+.meas td { padding: 3px 6px 3px 0; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+.meas td .inp.num { width: 72px; }
+.meas td.d .inf { display: inline-block; width: 72px; font: 600 22px/1 var(--font-cond); padding-left: 8px; }
+.meas td .unit { margin-left: 5px; color: var(--muted); font-size: 13px; }
+.meas td.x { width: 30px; }
+#measSec .res { font-size: 14px; display: grid; gap: 4px; }
+#measSec .res .warn { color: var(--warn); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
@@ -447,8 +462,9 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
         <div class="row">
           <button class="btn" id="btnAdd" type="button">Lenzen laden</button>
           <button class="btn" id="btnDir" type="button">Map laden</button>
+          <button class="btn" id="btnMeasure" type="button">Lens inmeten</button>
         </div>
-        <p class="hint">Of sleep .tl-bestanden hierheen. Elke lens komt vanzelf in de map van zijn merk.</p>
+        <p class="hint">Of sleep .tl-bestanden hierheen. Elke lens komt vanzelf in de map van zijn merk. Geen lensbestand? Met Lens inmeten lees je de lens zelf af op het meetlabel.</p>
         <input type="file" id="fileIn" accept=".tl,.json,application/json,text/plain" multiple hidden>
         <input type="file" id="dirIn" webkitdirectory multiple hidden>
       </section>
@@ -584,7 +600,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
       </details>
       <section class="stack">
         <h2>Meetlabel</h2>
-        <p class="hint">Een strook met een mm-schaal vanaf de nudge. Hiermee meet je waar ∞ valt.</p>
+        <p class="hint">Een strook met een mm-schaal vanaf de nudge. Hiermee meet je waar ∞ valt, of meet je een hele lens in zonder lensbestand.</p>
         <div class="row"><button class="btn small" id="btnCalib" type="button">Meetlabel downloaden</button></div>
       </section>
       <section class="stack" id="jigBox" hidden>
@@ -1012,6 +1028,43 @@ var Engine = (function () {
   }
   function decimals(t) { var m = String(t).match(/\.(\d+)/); return m ? m[1].length : 0; }
 
+  // ---------- zelf ingemeten lens (zonder lensbestand) ----------
+  // lens.measured = { ref: 'center' | 'top' | 'bottom', rows: [{ t: '∞' | '1.5' | 2'6", mm: '81.5' }] }
+  // mm = afgelezen op het meetlabel van de ring, vanaf ref van de nudge; werkt dus met elk systeem en elke lens.
+  function distText(t) {
+    var s = String(t === undefined || t === null ? '' : t).trim().replace(',', '.');
+    if (/^(inf|infinity|∞|oneindig)$/i.test(s)) return 'INF';
+    var ft = s.match(/^(\d+)\s*'\s*(\d+(?:\.\d+)?)?\s*(?:"|'')?$/);   // voet en duim, bijv. 2'6"
+    if (ft) return String(Math.round((Number(ft[1]) + (ft[2] ? Number(ft[2]) / 12 : 0)) * 100) / 100);
+    s = s.replace(/\s*(m|ft)$/i, '');
+    if (!/^\d*\.?\d+$/.test(s)) return '';
+    var n = Number(s);
+    return n > 0 ? String(n) : '';
+  }
+  // punten op de strook: fv = -positie (mm vanaf de bovenkant van de nudge-as), zodat de gewone opbouw werkt
+  function measuredPts(lens, ring) {
+    var M = lens.measured || {}, h = ring.notch.h, C = ring.circ || 0;
+    var z = M.ref === 'top' ? -h : M.ref === 'bottom' ? h : 0;
+    var rows = [], seen = {}, dupes = [];
+    (M.rows || []).forEach(function (r) {
+      var t = distText(r.t), mm = parseFloat(String(r.mm === undefined || r.mm === null ? '' : r.mm).replace(',', '.'));
+      if (!t || !isFinite(mm)) return;
+      if (seen[t]) { dupes.push(t); return; }
+      seen[t] = 1;
+      rows.push({ text: t, d: distOf(t), mm: mm });
+    });
+    rows.sort(function (a, b) { return b.d - a.d; });          // ∞ eerst, dan steeds dichterbij
+    var prev = -Infinity, back = [], pts = [];
+    rows.forEach(function (p) {
+      var raw = z + p.mm;
+      if (C) { while (raw < prev - 0.5) raw += C; }            // rondlopende ring: na de rand van het meetlabel weer vanaf 0
+      else if (raw < prev - 0.05) back.push(p.text);           // dichterbij hoort verder van ∞ te liggen
+      prev = Math.max(prev, raw);
+      pts.push({ text: p.text, d: p.d, fv: -raw, mm: p.mm });
+    });
+    return { pts: pts, dupes: dupes, back: back, hasInf: rows.some(function (p) { return p.d === Infinity; }), count: rows.length };
+  }
+
   // ---------- ring + transform ----------
   // rs = instellingen van de gebruiker; geeft complete ringmaten terug
   // oude sleutels uit eerdere versies
@@ -1188,7 +1241,8 @@ var Engine = (function () {
     };
     var rightBoxes = [];
     var pts = [];
-    for (var i = 0; i < lens.focus.length; i++) {
+    if (lens.measured) pts = measuredPts(lens, ring).pts;   // zelf ingemeten: fv = -positie in mm
+    else for (var i = 0; i < lens.focus.length; i++) {
       var d = distOf(lens.focus[i]);
       if (isNaN(d) || !isFinite(lens.fv[i])) continue;
       pts.push({ text: String(lens.focus[i]).trim(), d: d, fv: lens.fv[i] });
@@ -1197,7 +1251,7 @@ var Engine = (function () {
     var inf = pts.filter(function (p) { return p.d === Infinity; })[0];
     var own = inf ? inf.fv : (pts[0] ? pts[0].fv : 10000);
     var anchor = ring.infMode === 'lens' && ring.anchorFv !== null ? ring.anchorFv : own;
-    var vOf = function (fv) { return ring.offset + (anchor - fv) * ring.unit; };
+    var vOf = lens.measured ? function (fv) { return -fv; } : function (fv) { return ring.offset + (anchor - fv) * ring.unit; };
     var vLimit = ring.bottom - ring.endZone;
     var C = ring.circ || 0;
     // rondlopende schaal: voorbij het eind van het label verder bovenaan (tot vlak voor ∞)
@@ -1576,7 +1630,7 @@ var Engine = (function () {
       [700, 3.0, 'How to measure the nudge to infinity'],
       [400, 0, ''],
       [400, 2.2, '1. Cut out a strip along the line.'],
-      [400, 2.2, '2. Stick it on the ring, with the cutout around the nudge.'],
+      [400, 2.2, ring.notch.depth > 0 ? '2. Stick it on the ring, with the cutout around the nudge.' : '2. Stick it on the ring, with 0 against the nudge.'],
       [400, 2.2, '3. Turn the lens to infinity (\u221e).'],
       [400, 2.2, '4. Read the scale at the index mark of your hand unit.'],
       [400, 2.2, '5. Enter that number at "Nudge to \u221e line".'],
@@ -1588,12 +1642,16 @@ var Engine = (function () {
       [700, 2.2, 'Checking the scale'],
       [400, 1.9, 'Also read at the closest distance (MOD) of the lens.'],
       [400, 1.9, 'The difference from infinity, compared with "From \u221e"'],
-      [400, 1.9, 'in the app, shows whether the scale is right for this ring.']
+      [400, 1.9, 'in the app, shows whether the scale is right for this ring.'],
+      [400, 0, ''],
+      [700, 2.2, 'Lens without a lens file'],
+      [400, 1.9, 'Choose "Measure a lens" in the app. Set the lens to every'],
+      [400, 1.9, 'distance marked on it and enter what you read here.']
     ] : [
       [700, 3.0, 'Zo meet je de nudge tot oneindig'],
       [400, 0, ''],
       [400, 2.2, '1. Knip een strook uit langs de lijn.'],
-      [400, 2.2, '2. Plak hem op de ring, met de uitsparing om de nudge.'],
+      [400, 2.2, ring.notch.depth > 0 ? '2. Plak hem op de ring, met de uitsparing om de nudge.' : '2. Plak hem op de ring, met 0 tegen de nudge.'],
       [400, 2.2, '3. Draai de lens naar oneindig (\u221e).'],
       [400, 2.2, '4. Lees de schaal af bij het indexstreepje van je handunit.'],
       [400, 2.2, '5. Vul dat getal in bij "Nudge tot \u221e-lijn".'],
@@ -1605,7 +1663,11 @@ var Engine = (function () {
       [700, 2.2, 'Controle van de schaal'],
       [400, 1.9, 'Lees ook af bij de kortste afstand (MOD) van de lens.'],
       [400, 1.9, 'Het verschil met oneindig, vergeleken met "Vanaf \u221e"'],
-      [400, 1.9, 'in de app, laat zien of de schaal klopt voor deze ring.']
+      [400, 1.9, 'in de app, laat zien of de schaal klopt voor deze ring.'],
+      [400, 0, ''],
+      [700, 2.2, 'Lens zonder lensbestand'],
+      [400, 1.9, 'Kies "Lens inmeten" in de app. Zet de lens op elke afstand'],
+      [400, 1.9, 'die erop staat en vul in wat je hier afleest.']
     ];
     var yy = ty;
     lines.forEach(function (l) {
@@ -1873,7 +1935,8 @@ var Engine = (function () {
     prettyBrand: prettyBrand, brandKey: brandKey, autoBottom: autoBottom, autoTop: autoTop, tstopFrom: tstopFrom,
     layoutLens: layoutLens, buildStrip: buildStrip, buildPages: buildPages,
     pageSVG: pageSVG, buildPDF: buildPDF, textWidth: textWidth, distOf: distOf, buildCalibPages: buildCalibPages,
-    setLang: setLang, lang: function () { return LANG; }, cornerRadii: cornerRadii
+    setLang: setLang, lang: function () { return LANG; }, cornerRadii: cornerRadii,
+    distText: distText, measuredPts: measuredPts
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
@@ -2184,6 +2247,37 @@ var I18N = (function () {
     'Geen cijfer': 'No number',
     'Alles terug op auto': 'Reset all to auto',
 
+    // lens zelf inmeten
+    'Lens inmeten': 'Measure a lens',
+    'Of sleep .tl-bestanden hierheen. Elke lens komt vanzelf in de map van zijn merk. Geen lensbestand? Met Lens inmeten lees je de lens zelf af op het meetlabel.':
+      'Or drag .tl files here. Each lens goes into the folder of its brand automatically. No lens file? With Measure a lens you read the lens yourself off the calibration label.',
+    'Geen lensbestand, of een ander systeem dan de Nucleus?': 'No lens file, or a system other than the Nucleus?',
+    'Lens zelf inmeten': 'Measure a lens yourself',
+    'ingemeten': 'measured',
+    'Nieuwe lens': 'New lens',
+    'Inmeten': 'Measure',
+    'Merk': 'Brand',
+    'Serie': 'Series',
+    'Brandpunt': 'Focal length',
+    'Afstanden in': 'Distances in',
+    'meter': 'metres',
+    'feet': 'feet',
+    'bijv. Cooke': 'e.g. Cooke',
+    'bijv. S4': 'e.g. S4',
+    'Zo meet je in': 'How to measure',
+    'Zet de lens op ∞ en lees af bij het indexstreepje van je handunit. Vul het getal in bij ∞.': 'Set the lens to ∞ and read the scale at the index mark of your hand unit. Enter that number at ∞.',
+    'Doe hetzelfde voor elke afstand die op de lens staat. Lege regels tellen niet mee.': 'Do the same for every distance marked on the lens. Empty rows are ignored.',
+    'Een afstand die niet op de lens staat? Zet hem met een meetlint en voeg hem toe.': 'A distance that is not marked on the lens? Set it with a tape measure and add it.',
+    'Werkt met elk systeem: je meet op de ring zelf, dus lensbestanden en motorwaarden doen er niet toe.': 'Works with any system: you measure on the ring itself, so lens files and motor values do not matter.',
+    'Afgelezen': 'Reading',
+    'Regel weghalen': 'Remove row',
+    '+ Afstand': '+ Distance',
+    'Vul eerst ∞ in: daar begint de schaal.': 'Enter ∞ first: that is where the scale starts.',
+    'nog geen ∞ ingemeten': 'no ∞ measured yet',
+    'Afgelezen bij oneindig in mm': 'Reading at infinity in mm',
+    'Een strook met een mm-schaal vanaf de nudge. Hiermee meet je waar ∞ valt, of meet je een hele lens in zonder lensbestand.':
+      'A strip with a mm scale starting at the nudge. Use it to measure where ∞ falls, or to measure a whole lens without a lens file.',
+
     // meldingen
     'Er staat al een opslagvenster open. Probeer het zo opnieuw.': 'A save dialog is already open. Try again in a moment.',
     'Opslaan lukt hier niet. Open de app als los bestand in Chrome om te downloaden.': 'Saving does not work here. Open the app as a standalone file in Chrome to download.',
@@ -2280,6 +2374,18 @@ var I18N = (function () {
       function (m) { return 'Cutout ' + m[1] + ' × ' + m[2] + ' mm. ∞ is ' + m[3] + ' mm below ' + REF_EN[m[4]] + ' of the nudge.'; }],
     [/^Geen uitsparing\. ∞ ligt (.+) mm onder (het midden|de bovenrand|de onderrand) van de nudge\.$/,
       function (m) { return 'No cutout. ∞ is ' + m[1] + ' mm below ' + REF_EN[m[2]] + ' of the nudge.'; }],
+    [/^Print het meetlabel op 100% en plak een strook om de ring, met 0 tegen (het midden|de bovenrand|de onderrand) van de nudge\.$/,
+      function (m) { return 'Print the calibration label at 100% and stick a strip around the ring, with 0 at ' + REF_EN[m[1]] + ' of the nudge.'; }],
+    [/^Ingemeten op (.+)\. Deze map gebruikt (.+); de streepjes kloppen alleen op de ring waarop je hebt gemeten\.$/,
+      function (m, tr) { return 'Measured on ' + (m[1] === 'een ander profiel' ? 'another profile' : tr(m[1])) + '. This folder uses ' + tr(m[2]) + '; the marks are only right on the ring you measured on.'; }],
+    [/^Klopt dit\? (.+) (m|ft) ligt dichter bij ∞ dan een verdere afstand\.$/, 'Is this right? $1 $2 is closer to ∞ than a farther distance.'],
+    [/^Dubbel ingevuld: (.+) (m|ft)\. Alleen de eerste telt\.$/, 'Entered twice: $1 $2. Only the first one counts.'],
+    [/^(\d+) (afstand|afstanden) ingemeten\. De tussenstreepjes rekent de app ertussen uit\.$/,
+      function (m) { return m[1] + (m[2] === 'afstand' ? ' distance' : ' distances') + ' measured. The app calculates the minor ticks in between.'; }],
+    [/^Nieuwe lens in (.+)\. Vul de afgelezen mm in; de strook tekent mee\.$/, 'New lens in $1. Enter the readings in mm; the strip updates as you type.'],
+    [/^Afstand in (m|ft)$/, 'Distance in $1'],
+    [/^Afgelezen bij (.+) in mm$/, 'Reading at $1 in mm'],
+    [/^Regel (.+) weghalen$/, 'Remove row $1'],
     [/^(.*) {2}\(automatisch\)$/, '$1  (automatic)'],
     [/^(\d+) afstanden$/, '$1 distances'],
     [/^(\d+) tussenstreepjes$/, '$1 minor ticks'],
@@ -2884,7 +2990,7 @@ function renderFolders() {
         row.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse' && !e.target.closest('button, .grip')) dragStart(e, l, row); });
         row.appendChild(grip);
         row.appendChild(el('span', 'f', l.focal || l.topText || '?'));
-        row.appendChild(el('span', 'meta', [l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : '', l.unit === 'ft' ? 'ft' : ''].filter(Boolean).join(' · ')));
+        row.appendChild(el('span', 'meta', [l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : '', l.unit === 'ft' ? 'ft' : '', l.measured ? 'ingemeten' : ''].filter(Boolean).join(' · ')));
         var tools = el('span', 'tools');
         function tb(label, title, fn, dis) {
           var x = el('button', 'iconbtn', label); x.type = 'button'; x.title = title; x.setAttribute('aria-label', title + ' (' + (l.topText || l.focal) + ')');
@@ -3288,7 +3394,7 @@ function buildRingSliders() {
   ringSliders = main.concat(size, notch, corners);
 }
 var REF_HINT = { center: 'vanaf midden nudge', top: 'vanaf bovenrand nudge', bottom: 'vanaf onderrand nudge' };
-function infFvOf(l) { for (var i = 0; i < l.focus.length; i++) if (Engine.distOf(l.focus[i]) === Infinity) return Number(l.fv[i]); return null; }
+function infFvOf(l) { if (l.measured) return null; for (var i = 0; i < l.focus.length; i++) if (Engine.distOf(l.focus[i]) === Infinity) return Number(l.fv[i]); return null; }
 function lensName(l) { return [l.brandName, l.focal ? l.focal + ' mm' : ''].filter(Boolean).join(' '); }
 function renderAnchor() {
   var r = curRing(), rs = curRs(), lensMode = r.infMode === 'lens';
@@ -3435,6 +3541,9 @@ function startCard() {
   var ex = el('p', 'hint'); ex.appendChild(el('span', '', 'Nog geen .tl-bestanden bij de hand? '));
   var eb = el('button', 'linkbtn', 'Voorbeeld bekijken'); eb.type = 'button'; eb.id = 'btnExample'; eb.onclick = loadExample; ex.appendChild(eb);
   c.appendChild(ex);
+  var mx = el('p', 'hint'); mx.appendChild(el('span', '', 'Geen lensbestand, of een ander systeem dan de Nucleus? '));
+  var mb = el('button', 'linkbtn', 'Lens zelf inmeten'); mb.type = 'button'; mb.id = 'btnMeasureStart'; mb.onclick = newMeasuredLens; mx.appendChild(mb);
+  c.appendChild(mx);
   return c;
 }
 function renderPages() {
@@ -3673,6 +3782,133 @@ function calSection(l, ring, lay) {
   sec.appendChild(box);
   return sec;
 }
+// ---------- lens zelf inmeten (zonder lensbestand, werkt met elk systeem) ----------
+// per afstand op de lens lees je op het meetlabel af hoeveel mm hij van de nudge ligt; de app zet de streepjes
+// precies daar en berekent de tussenstreepjes (lineair in 1/afstand). Geen schaal of ∞-referentie nodig.
+var MEAS_ROWS = { m: ['∞', '10', '5', '3', '2', '1.5', '1.2', '1', '0.9', '0.8', '0.7', '0.6', '0.5', '0.45', '0.4', '0.35'],
+  ft: ['∞', '25', '15', '10', '8', '6', '5', '4', '3.5', '3', '2.5', '2', '1.75', '1.5'] };
+function measRows(unit) { return MEAS_ROWS[unit === 'ft' ? 'ft' : 'm'].map(function (t) { return { t: t, mm: '' }; }); }
+function newMeasuredLens() {
+  var f = activeFolder(); if (!f) return;
+  var prof = profileOf(f), ring = ringOf(f);
+  var l = { id: uid('l'), brand: '', brandName: '', series: '', focal: '', tstop: '', unit: 'm', focus: [], fv: [],
+    topText: '', bottomText: '', overrides: {}, include: true, source: '', folderId: f.id,
+    measured: { ref: ring.zeroRef, profileId: prof.id, rows: measRows('m') } };
+  delete f.starter;
+  P.lenses.push(l); P.active = f.id; f.open = true; sel = l.id;
+  OPEN.dMeasHow = true;
+  changed();
+  showTab('lib');
+  setTimeout(function () {
+    var s = $('measSec'); if (s) s.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    var i = $('meas_brand'); if (i) i.focus({ preventScroll: true });
+  }, 80);
+  toast('Nieuwe lens in ' + f.name + '. Vul de afgelezen mm in; de strook tekent mee.');
+}
+var MEAS_T = 0;
+function measureSection(l, ring, onName) {
+  var M = l.measured, f = folderById(l.folderId), prof = profileOf(f);
+  var sec = el('section', 'stack'); sec.id = 'measSec';
+  sec.appendChild(el('h2', '', 'Inmeten'));
+  function live() { cache = {}; persist(); renderFolders(); renderPages(); renderCloseup(); renderDock(); clearTimeout(MEAS_T); MEAS_T = setTimeout(refreshDetailLive, 150); }
+  // naam van de lens
+  var nm = el('div', 'measname');
+  function nameField(label, key, max, ph, id, mode) {
+    var lab = el('label', 'field'); lab.appendChild(el('span', '', label));
+    var i = document.createElement('input'); i.className = 'inp'; i.type = 'text'; i.maxLength = max; i.value = l[key] || ''; i.id = id; i.placeholder = ph;
+    if (mode) i.inputMode = mode;
+    i.oninput = function () {
+      l[key] = i.value.trim(); if (key === 'brandName') l.brand = l.brandName;
+      if (key === 'focal') l.focal = l.focal.replace(',', '.').replace(/\s*mm$/i, '');
+      live(); onName();
+    };
+    lab.appendChild(i); return lab;
+  }
+  nm.appendChild(nameField('Merk', 'brandName', 24, 'bijv. Cooke', 'meas_brand'));
+  nm.appendChild(nameField('Serie', 'series', 20, 'bijv. S4', 'meas_series'));
+  nm.appendChild(nameField('Brandpunt', 'focal', 6, 'mm', 'meas_focal', 'decimal'));
+  var ul = el('label', 'field'); ul.appendChild(el('span', '', 'Afstanden in'));
+  var us = document.createElement('select'); us.className = 'inp'; us.id = 'meas_unit';
+  [['m', 'meter'], ['ft', 'feet']].forEach(function (o) { var op = el('option', '', o[1]); op.value = o[0]; us.appendChild(op); });
+  us.value = l.unit === 'ft' ? 'ft' : 'm';
+  us.onchange = function () {
+    l.unit = us.value;
+    // nog niets afgelezen: de voorgestelde afstanden meteen omzetten naar de andere eenheid
+    if (!M.rows.some(function (r) { return String(r.mm).trim() !== ''; })) M.rows = measRows(l.unit);
+    changed();
+  };
+  ul.appendChild(us); nm.appendChild(ul);
+  sec.appendChild(nm);
+
+  var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[M.ref] || 'het midden';
+  var how = moreBox('dMeasHow', 'Zo meet je in');
+  var ol = el('ol', 'steps small');
+  ['Print het meetlabel op 100% en plak een strook om de ring, met 0 tegen ' + refWord + ' van de nudge.',
+   'Zet de lens op ∞ en lees af bij het indexstreepje van je handunit. Vul het getal in bij ∞.',
+   'Doe hetzelfde voor elke afstand die op de lens staat. Lege regels tellen niet mee.',
+   'Een afstand die niet op de lens staat? Zet hem met een meetlint en voeg hem toe.'].forEach(function (t) { ol.appendChild(el('li', '', t)); });
+  how.body.appendChild(ol);
+  var cb = el('button', 'btn small', 'Meetlabel downloaden'); cb.type = 'button'; cb.onclick = function () { $('btnCalib').click(); };
+  var cr = el('div', 'row'); cr.appendChild(cb); how.body.appendChild(cr);
+  how.body.appendChild(el('p', 'hint', 'Werkt met elk systeem: je meet op de ring zelf, dus lensbestanden en motorwaarden doen er niet toe.'));
+  sec.appendChild(how.box);
+
+  // tabel: afstand | afgelezen mm
+  var tw = el('div', 'tablewrap'), t = el('table', 'meas');
+  t.innerHTML = '<thead><tr><th>Afstand</th><th>Afgelezen</th><th><span class="sr">Weghalen</span></th></tr></thead>';
+  var tb = el('tbody'), mmInputs = [];
+  var unitTxt = l.unit === 'ft' ? 'ft' : 'm';
+  M.rows.forEach(function (r, idx) {
+    var tr = el('tr'), isInf = Engine.distText(r.t) === 'INF';
+    var td1 = el('td', 'd');
+    if (isInf) td1.appendChild(el('span', 'inf', '∞'));
+    else {
+      var di = document.createElement('input'); di.className = 'inp num'; di.type = 'text'; di.inputMode = 'decimal'; di.maxLength = 7; di.value = r.t;
+      di.id = 'meas_d' + idx; di.setAttribute('aria-label', 'Afstand in ' + unitTxt);
+      di.oninput = function () { r.t = di.value; live(); status(); };
+      td1.appendChild(di); td1.appendChild(el('span', 'unit', unitTxt));
+    }
+    var td2 = el('td', 'v');
+    var mi = document.createElement('input'); mi.className = 'inp num'; mi.type = 'text'; mi.inputMode = 'decimal'; mi.maxLength = 7; mi.value = r.mm;
+    mi.id = 'meas_mm' + idx; mi.placeholder = '–'; mi.setAttribute('aria-label', 'Afgelezen bij ' + (isInf ? 'oneindig' : r.t + ' ' + unitTxt) + ' in mm');
+    mi.oninput = function () { r.mm = mi.value.trim(); live(); status(); };
+    mi.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); var n = mmInputs[mmInputs.indexOf(mi) + 1]; if (n) { n.focus(); n.select(); } } };
+    mmInputs.push(mi);
+    td2.appendChild(mi); td2.appendChild(el('span', 'unit', 'mm'));
+    var td3 = el('td', 'x');
+    if (!isInf) {
+      var rb = el('button', 'iconbtn', '×'); rb.type = 'button'; rb.title = 'Regel weghalen'; rb.setAttribute('aria-label', 'Regel ' + (r.t || idx) + ' weghalen');
+      rb.onclick = function () { M.rows.splice(M.rows.indexOf(r), 1); changed(); };
+      td3.appendChild(rb);
+    }
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tb.appendChild(tr);
+  });
+  t.appendChild(tb); tw.appendChild(t); sec.appendChild(tw);
+  var ar = el('div', 'row');
+  var add = el('button', 'btn small', '+ Afstand'); add.type = 'button';
+  add.onclick = function () {
+    // eerst sorteren (ver naar dichtbij), dan een lege regel onderaan
+    M.rows.sort(function (a, b) { var da = Engine.distOf(Engine.distText(a.t)), db = Engine.distOf(Engine.distText(b.t)); return (isNaN(db) ? -1 : db) - (isNaN(da) ? -1 : da); });
+    M.rows.push({ t: '', mm: '' }); changed();
+    setTimeout(function () { var i = $('meas_d' + (M.rows.length - 1)); if (i) i.focus(); }, 60);
+  };
+  ar.appendChild(add); sec.appendChild(ar);
+  var st = el('div', 'res'); st.id = 'measStatus'; sec.appendChild(st);
+  function status() {
+    st.textContent = '';
+    var r = Engine.measuredPts(l, ring);
+    if (prof && M.profileId && M.profileId !== prof.id) {
+      var src = profileById(M.profileId);
+      st.appendChild(el('span', 'warn', 'Ingemeten op ' + (src ? src.name : 'een ander profiel') + '. Deze map gebruikt ' + prof.name + '; de streepjes kloppen alleen op de ring waarop je hebt gemeten.'));
+    }
+    if (!r.hasInf) st.appendChild(el('span', 'warn', 'Vul eerst ∞ in: daar begint de schaal.'));
+    if (r.back.length) st.appendChild(el('span', 'warn', 'Klopt dit? ' + r.back.join(', ') + ' ' + unitTxt + ' ligt dichter bij ∞ dan een verdere afstand.'));
+    if (r.dupes.length) st.appendChild(el('span', 'warn', 'Dubbel ingevuld: ' + r.dupes.join(', ') + ' ' + unitTxt + '. Alleen de eerste telt.'));
+    if (r.hasInf && !r.back.length) st.appendChild(el('span', '', r.count + (r.count === 1 ? ' afstand' : ' afstanden') + ' ingemeten. De tussenstreepjes rekent de app ertussen uit.'));
+  }
+  status();
+  return sec;
+}
 // ---------- T-stop per lens (handmatig, de app vult niets zelf in) ----------
 function cleanTs(v) { return String(v || '').trim().replace(/^[TtFf]\s*/, '').replace(',', '.'); }
 function tstopSection(l, onChange) {
@@ -3714,6 +3950,61 @@ function tstopSection(l, onChange) {
   if (ls.length > 1) { var r = el('div', 'row'); r.appendChild(fill); sec.appendChild(r); }
   return sec;
 }
+// delen van het detailpaneel die van de lensposities afhangen; ook los bij te werken tijdens het inmeten
+function nudgeHint(ring, lay) {
+  var g = ring.notch;
+  var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
+  var infHere = lay.inf ? lay.inf.v - ring.zeroV : ring.offsetInput;
+  var infTxt = '∞ ligt ' + dec(Math.round(infHere * 100) / 100) + ' mm onder ' + refWord + ' van de nudge.';
+  return g.depth > 0 ? 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ' + infTxt : 'Geen uitsparing. ' + infTxt;
+}
+function fillStats(stats, l, lay) {
+  stats.textContent = '';
+  var none = 0, conf = 0;
+  lay.data.forEach(function (m) { if (m.place === 'none') none++; if (m.conflict) conf++; });
+  addPill(stats, lay.data.length + ' afstanden');
+  addPill(stats, lay.minors.length + ' tussenstreepjes');
+  if (lay.cut.length) addPill(stats, lay.cut.map(function (c) { return c.text; }).join(', ') + ' valt buiten de ring', true);
+  if (none) addPill(stats, none + ' zonder cijfer', true);
+  if (conf) addPill(stats, conf + ' overlapt', true);
+  if (!lay.inf) addPill(stats, l.measured ? 'nog geen ∞ ingemeten' : 'geen ∞ in bestand', true);
+}
+function fillMarks(sec, l, lay, ring) {
+  sec.textContent = '';
+  var nOv = Object.keys(l.overrides || {}).length;
+  sec.appendChild(el('p', 'hint', 'Auto kiest zelf. R = groot cijfer rechts, L = klein cijfer links, – = alleen een streepje. Het lijntje onder een knop toont wat auto kiest.'));
+  var wrap = el('div', 'tablewrap'), t = el('table', 'marks');
+  t.innerHTML = '<thead><tr><th>Afstand</th><th>Vanaf ∞</th><th>Plaats</th></tr></thead>';
+  var tbody = el('tbody'), infV = lay.inf ? lay.inf.v : ring.offset;
+  lay.data.forEach(function (m) {
+    var tr = el('tr', m.conflict ? 'conf' : '');
+    tr.appendChild(el('td', 'd', m.text + (l.unit === 'ft' ? ' ft' : ' m')));
+    tr.appendChild(el('td', 'v', fmtMM(m.v - infV) + ' mm'));
+    var td3 = el('td'), seg = el('div', 'seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Plaats van ' + m.text);
+    var cur = (l.overrides || {})[m.text] || 'auto', autoPlace = m.auto ? m.place : null;
+    [['auto', 'Auto'], ['right', 'R'], ['left', 'L'], ['none', '–']].forEach(function (o) {
+      var b = el('button', cur === 'auto' && autoPlace === o[0] ? 'autoMark' : '', o[1]); b.type = 'button';
+      b.title = { auto: 'Automatisch', right: 'Rechts, groot', left: 'Links, klein', none: 'Geen cijfer' }[o[0]];
+      b.setAttribute('aria-pressed', cur === o[0] ? 'true' : 'false');
+      b.onclick = function () { l.overrides = l.overrides || {}; if (o[0] === 'auto') delete l.overrides[m.text]; else l.overrides[m.text] = o[0]; changed(); };
+      seg.appendChild(b);
+    });
+    td3.appendChild(seg); tr.appendChild(td3); tbody.appendChild(tr);
+  });
+  t.appendChild(tbody); wrap.appendChild(t); sec.appendChild(wrap);
+  if (nOv) {
+    var rs = el('button', 'btn small', 'Alles terug op auto'); rs.type = 'button';
+    rs.onclick = function () { l.overrides = {}; changed(); };
+    var rr = el('div', 'row'); rr.appendChild(rs); sec.appendChild(rr);
+  }
+}
+function refreshDetailLive() {
+  var l = sel && lensById(sel); if (!l) return;
+  var ring = ringOf(folderById(l.folderId) || activeFolder()), lay = Engine.layoutLens(l, ring);
+  var h = $('nudgeHint'); if (h) h.textContent = nudgeHint(ring, lay);
+  var st = $('lensStats'); if (st) fillStats(st, l, lay);
+  var mk = $('marksBody'); if (mk) fillMarks(mk, l, lay, ring);
+}
 function renderDetail() {
   var root = $('detail'); root.textContent = '';
   var l = sel && lensById(sel), f = activeFolder();
@@ -3725,20 +4016,22 @@ function renderDetail() {
 
   var head = el('section');
   var lh = el('div', 'lenshead');
-  lh.appendChild(el('span', 'big', l.focal || l.topText));
-  lh.appendChild(el('span', 'who', [l.brandName, l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : ''].filter(Boolean).join(' ')));
+  var lhBig = el('span', 'big'), lhWho = el('span', 'who');
+  function headText() {
+    lhBig.textContent = l.focal || l.topText || (l.measured ? '—' : '');
+    lhWho.textContent = [l.brandName, l.series, l.focal ? l.focal + ' mm' : '', l.tstop ? 'T' + l.tstop : ''].filter(Boolean).join(' ') || (l.measured ? 'Nieuwe lens' : '');
+  }
+  headText();
+  lh.appendChild(lhBig); lh.appendChild(lhWho);
   head.appendChild(lh);
   root.appendChild(head);
+  if (l.measured) root.appendChild(measureSection(l, ring, function () { headText(); if (typeof refreshAuto === 'function') refreshAuto(); }));
   root.appendChild(tstopSection(l, function () { if (typeof refreshAuto === 'function') refreshAuto(); }));
 
   var cu = el('section');
   cu.appendChild(el('h2', '', 'Nudge'));
   var cbox = el('div', 'closeup'); cbox.id = 'closeup'; cu.appendChild(cbox);
-  var g = ring.notch;
-  var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
-  var infHere = lay.inf ? lay.inf.v - ring.zeroV : ring.offsetInput;
-  var infTxt = '∞ ligt ' + dec(Math.round(infHere * 100) / 100) + ' mm onder ' + refWord + ' van de nudge.';
-  cu.appendChild(el('p', 'hint', g.depth > 0 ? 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ' + infTxt : 'Geen uitsparing. ' + infTxt));
+  var nh = el('p', 'hint', nudgeHint(ring, lay)); nh.id = 'nudgeHint'; cu.appendChild(nh);
   if (isTiltaRing(profileOf(folderById(l.folderId)))) {
     var jl = el('a', 'btn small', 'Mal voor de Tilta ARRI-ring (STL)'); jl.href = JIG_URL; jl.target = '_blank'; jl.rel = 'noopener';
     if (window.__PWA__) jl.setAttribute('download', JIG_FILE);
@@ -3768,48 +4061,21 @@ function renderDetail() {
   fields.appendChild(el('p', 'hint', 'Leeg laten = automatische tekst.'));
   root.appendChild(fields);
 
-  var stats = el('div', 'stats');
-  var none = 0, conf = 0;
-  lay.data.forEach(function (m) { if (m.place === 'none') none++; if (m.conflict) conf++; });
-  addPill(stats, lay.data.length + ' afstanden');
-  addPill(stats, lay.minors.length + ' tussenstreepjes');
-  if (lay.cut.length) addPill(stats, lay.cut.map(function (c) { return c.text; }).join(', ') + ' valt buiten de ring', true);
-  if (none) addPill(stats, none + ' zonder cijfer', true);
-  if (conf) addPill(stats, conf + ' overlapt', true);
-  if (!lay.inf) addPill(stats, 'geen ∞ in bestand', true);
+  var stats = el('div', 'stats'); stats.id = 'lensStats';
+  fillStats(stats, l, lay);
   fields.appendChild(stats);
 
-  var cs = calSection(l, ring, lay), cm = moreBox('dCal', 'Schaal nameten');
-  Array.prototype.slice.call(cs.childNodes).forEach(function (n) { if (n.tagName !== 'H2') cm.body.appendChild(n); });
-  root.appendChild(cm.box);
+  // schaal nameten gaat over lensbestanden; een ingemeten lens staat al op zijn eigen afgelezen plekken
+  if (!l.measured) {
+    var cs = calSection(l, ring, lay), cm = moreBox('dCal', 'Schaal nameten');
+    Array.prototype.slice.call(cs.childNodes).forEach(function (n) { if (n.tagName !== 'H2') cm.body.appendChild(n); });
+    root.appendChild(cm.box);
+  }
 
   var nOv = Object.keys(l.overrides || {}).length;
-  var mb = moreBox('dMarks', 'Cijfers per afstand', nOv ? nOv + ' aangepast' : ''), sec = mb.body;
-  sec.appendChild(el('p', 'hint', 'Auto kiest zelf. R = groot cijfer rechts, L = klein cijfer links, – = alleen een streepje. Het lijntje onder een knop toont wat auto kiest.'));
-  var wrap = el('div', 'tablewrap'), t = el('table', 'marks');
-  t.innerHTML = '<thead><tr><th>Afstand</th><th>Vanaf ∞</th><th>Plaats</th></tr></thead>';
-  var tbody = el('tbody'), infV = lay.inf ? lay.inf.v : ring.offset;
-  lay.data.forEach(function (m) {
-    var tr = el('tr', m.conflict ? 'conf' : '');
-    tr.appendChild(el('td', 'd', m.text + (l.unit === 'ft' ? ' ft' : ' m')));
-    tr.appendChild(el('td', 'v', fmtMM(m.v - infV) + ' mm'));
-    var td3 = el('td'), seg = el('div', 'seg'); seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Plaats van ' + m.text);
-    var cur = (l.overrides || {})[m.text] || 'auto', autoPlace = m.auto ? m.place : null;
-    [['auto', 'Auto'], ['right', 'R'], ['left', 'L'], ['none', '–']].forEach(function (o) {
-      var b = el('button', cur === 'auto' && autoPlace === o[0] ? 'autoMark' : '', o[1]); b.type = 'button';
-      b.title = { auto: 'Automatisch', right: 'Rechts, groot', left: 'Links, klein', none: 'Geen cijfer' }[o[0]];
-      b.setAttribute('aria-pressed', cur === o[0] ? 'true' : 'false');
-      b.onclick = function () { l.overrides = l.overrides || {}; if (o[0] === 'auto') delete l.overrides[m.text]; else l.overrides[m.text] = o[0]; changed(); };
-      seg.appendChild(b);
-    });
-    td3.appendChild(seg); tr.appendChild(td3); tbody.appendChild(tr);
-  });
-  t.appendChild(tbody); wrap.appendChild(t); sec.appendChild(wrap);
-  if (nOv) {
-    var rs = el('button', 'btn small', 'Alles terug op auto'); rs.type = 'button';
-    rs.onclick = function () { l.overrides = {}; changed(); };
-    var rr = el('div', 'row'); rr.appendChild(rs); sec.appendChild(rr);
-  }
+  var mb = moreBox('dMarks', 'Cijfers per afstand', nOv ? nOv + ' aangepast' : '');
+  mb.body.id = 'marksBody';
+  fillMarks(mb.body, l, lay, ring);
   root.appendChild(mb.box);
   if (l.source) root.appendChild(el('p', 'hint', 'Bron: ' + l.source));
   renderCloseup();
@@ -3942,6 +4208,7 @@ window.addEventListener('resize', function () { clearTimeout(window.__rz); windo
 
 $('btnAdd').onclick = function () { $('fileIn').click(); };
 $('btnDir').onclick = function () { $('dirIn').click(); };
+$('btnMeasure').onclick = newMeasuredLens;
 $('fileIn').onchange = function () { readFiles($('fileIn').files); $('fileIn').value = ''; };
 $('dirIn').onchange = function () { readFiles($('dirIn').files); $('dirIn').value = ''; };
 $('btnOpenLib').onclick = function () { $('libIn').click(); };
@@ -4382,7 +4649,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '39 · ' + (LANG === 'en' ? '2026-10-14 · original Tilta ring' : '14-10-2026 · originele Tilta-ring');
+var APP_VERSION = '40 · ' + (LANG === 'en' ? '2026-10-14 · measure a lens yourself' : '14-10-2026 · lens zelf inmeten');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
