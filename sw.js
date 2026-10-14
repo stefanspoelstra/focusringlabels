@@ -1,6 +1,6 @@
 // Focusringlabels: service worker. Bewaart de app op je Mac zodat hij ook zonder internet werkt.
 // Bij een nieuwe versie wacht hij tot je in de app op "Nu bijwerken" klikt.
-const VERSION = '467c7304ba';
+const VERSION = '3b7c0811c5';
 const CACHE = 'frl-' + VERSION;
 const ASSETS = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.svg", "mal/Focusringlabels_mal_Tilta-ARRI-ring.stl"];
 

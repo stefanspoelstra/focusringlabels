@@ -203,6 +203,9 @@ body.lensdrag, body.lensdrag * { cursor: grabbing !important; user-select: none;
 .lens.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
 .folder > .fhead.drop-into { outline: 2px dashed var(--accent); outline-offset: -2px; }
 .pages.side { flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+.sheet { user-select: none; -webkit-user-select: none; }
+.dropmark { position: fixed; width: 4px; border-radius: 2px; background: var(--sel, #ff5a36); box-shadow: 0 0 0 2px rgba(255,255,255,0.8); pointer-events: none; z-index: 30; }
+body.stripdrag, body.stripdrag * { cursor: grabbing !important; }
 .lens.off .f, .lens.off .meta { opacity: 0.45; text-decoration: line-through; }
 .lenslist .none { color: var(--muted); font-size: 13px; padding: 4px 8px; }
 
@@ -662,6 +665,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 
 <div id="printArea"></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<div class="dropmark" id="dropMark" hidden></div>
 <!-- telefoon: het gekozen label blijft in beeld terwijl je ontwerpt -->
 <div class="dock" id="dock" hidden>
   <div class="dockbar"><span id="dockName"></span><button type="button" class="linkbtn" id="dockZoom">Heel label</button></div>
@@ -1874,6 +1878,7 @@ var I18N = (function () {
     'Voorbeeld bekijken': 'View an example',
     'Inzoomen': 'Zoom in',
     'Klik op een strook om hem te kiezen': 'Click a strip to select it',
+    'Klik op een strook om hem te kiezen, sleep om de volgorde te veranderen': 'Click a strip to select it, drag to change the order',
     'Terug naar passend': 'Back to fit',
     'Slepen om te verplaatsen': 'Drag to move',
     'Lege map. Sleep een lens hierheen, of kies een andere map bij de lensinstellingen.': 'Empty folder. Drag a lens here, or choose another folder in the lens settings.',
@@ -3351,7 +3356,7 @@ function renderPages() {
   $('pageInfo').textContent = '';
   $('pageInfo').appendChild(el('b', '', f.name));
   $('pageInfo').appendChild(document.createTextNode(total + (total === 1 ? ' strook' : ' stroken') + ' op ' + pg.length + (pg.length === 1 ? ' vel A4' : ' vellen A4')));
-  var hint = el('span', 'stagehint', 'Klik op een strook om hem te kiezen'); $('pageInfo').appendChild(hint);
+  var hint = el('span', 'stagehint', 'Klik op een strook om hem te kiezen, sleep om de volgorde te veranderen'); $('pageInfo').appendChild(hint);
   var availW = sc.clientWidth - 12, sticky = window.innerWidth > 760;
   var base = sticky ? Math.min(availW, (sc.clientHeight - 12) * 210 / 297) : Math.min(availW, 640);
   // meer dan één vel en genoeg breedte: twee naast elkaar, zodat je ze in één oogopslag ziet
@@ -3367,6 +3372,62 @@ function renderPages() {
   });
   sc.scrollTop = keepT; sc.scrollLeft = keepL;
   $('zoomPct').hidden = z === 1; $('zoomPct').textContent = Math.round(z * 100) + '%';
+}
+// ---------- stroken op het vel slepen (muis of pen): de volgorde veranderen ----------
+var SD = null, SD_JUST = false, sdScrollT = null, sdV = [0, 0];
+$('pages').addEventListener('pointerdown', function (e) {
+  if (e.pointerType === 'touch' || e.button) return;   // op een aanraakscherm blijft vegen gewoon scrollen
+  var g = e.target.closest && e.target.closest('[data-lens]'); if (!g) return;
+  e.preventDefault();
+  SD = { id: g.getAttribute('data-lens'), g: g, x: e.clientX, y: e.clientY, on: false, target: null };
+  document.addEventListener('pointermove', sdMove, { passive: false });
+  document.addEventListener('pointerup', sdEnd);
+  document.addEventListener('pointercancel', sdStop);
+});
+function sdStop() {
+  document.removeEventListener('pointermove', sdMove); document.removeEventListener('pointerup', sdEnd); document.removeEventListener('pointercancel', sdStop);
+  $('dropMark').hidden = true; document.body.classList.remove('stripdrag');
+  if (SD && SD.g) SD.g.style.opacity = '';
+  clearInterval(sdScrollT); sdScrollT = null;
+}
+function sdMove(e) {
+  var d = SD; if (!d) return;
+  if (!d.on) {
+    if (Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y) < 6) return;
+    d.on = true; d.g.style.opacity = '0.35'; document.body.classList.add('stripdrag');
+  }
+  e.preventDefault();
+  // dichtstbijzijnde strook (niet de gesleepte): ervoor of erachter, naar waar de cursor staat
+  var best = null, bd = Infinity;
+  Array.prototype.forEach.call(document.querySelectorAll('#pages [data-lens]'), function (s) {
+    if (s === d.g) return;
+    var r = s.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2);
+    var dy = e.clientY < r.top ? r.top - e.clientY : e.clientY > r.bottom ? e.clientY - r.bottom : 0;
+    var dist = Math.abs(dx) + dy * 3;
+    if (dist < bd) { bd = dist; best = { el: s, r: r, after: dx > 0 }; }
+  });
+  var m = $('dropMark');
+  if (!best || bd > 260) { d.target = null; m.hidden = true; }
+  else {
+    d.target = { lens: best.el.getAttribute('data-lens'), after: best.after };
+    var gap = best.r.width * 0.18, mx = best.after ? best.r.right + gap : best.r.left - gap;
+    m.hidden = false; m.style.left = Math.round(mx - 2) + 'px'; m.style.top = Math.round(best.r.top) + 'px'; m.style.height = Math.round(best.r.height) + 'px';
+  }
+  // bij de rand van het vel vanzelf meescrollen (als je hebt ingezoomd)
+  var sc = document.querySelector('.pagescroll'), b = sc.getBoundingClientRect();
+  sdV = [e.clientX < b.left + 40 ? -12 : e.clientX > b.right - 40 ? 12 : 0, e.clientY < b.top + 40 ? -12 : e.clientY > b.bottom - 40 ? 12 : 0];
+  if ((sdV[0] || sdV[1]) && !sdScrollT) sdScrollT = setInterval(function () { sc.scrollLeft += sdV[0]; sc.scrollTop += sdV[1]; }, 16);
+  if (!sdV[0] && !sdV[1] && sdScrollT) { clearInterval(sdScrollT); sdScrollT = null; }
+}
+function sdEnd() {
+  var d = SD; sdStop(); SD = null;
+  if (!d || !d.on) return;
+  SD_JUST = true; setTimeout(function () { SD_JUST = false; }, 80);
+  if (!d.target || d.target.lens === d.id) return;
+  var l = lensById(d.id), o = lensById(d.target.lens); if (!l || !o) return;
+  P.lenses.splice(P.lenses.indexOf(l), 1);
+  P.lenses.splice(P.lenses.indexOf(o) + (d.target.after ? 1 : 0), 0, l);
+  sel = l.id; changed();
 }
 // zoom: alleen de breedte van de vellen aanpassen (snel, ook bij knijpen op het trackpad)
 var sheetBase = 0;
@@ -3393,6 +3454,7 @@ document.querySelector('.pagescroll').addEventListener('wheel', function (e) {
 }, { passive: false });
 $('zoomPct').addEventListener('click', function (e) { e.preventDefault(); setZoom(100); });
 $('pages').addEventListener('click', function (e) {
+  if (SD_JUST) return;
   var g = e.target.closest && e.target.closest('[data-lens]');
   if (g) { sel = g.getAttribute('data-lens'); changed(); if (narrowMQ.matches) setTimeout(function () { $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 60); }
 });
@@ -4218,7 +4280,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '37 · ' + (LANG === 'en' ? '2026-10-14 · drag lenses, sheets side by side' : '14-10-2026 · lenzen slepen, vellen naast elkaar');
+var APP_VERSION = '38 · ' + (LANG === 'en' ? '2026-10-14 · drag strips on the sheet' : '14-10-2026 · stroken op het vel slepen');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
