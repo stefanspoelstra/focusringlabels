@@ -681,7 +681,7 @@ var Engine = (function () {
   var LANG = 'nl';
   function setLang(l) { LANG = l === 'en' ? 'en' : 'nl'; }
   function say(nl, en) { return LANG === 'en' ? en : nl; }
-  var RING_EN = { 'arri-wcu4': 'ARRI WCU-4 ring', 'tilta-nucleus': 'Tilta ARRI ring on Nucleus-M II (via ARRI adapter)' };
+  var RING_EN = { 'arri-wcu4': 'ARRI WCU-4 ring', 'tilta-nucleus': 'Tilta ARRI ring on Nucleus-M II (via ARRI adapter)', 'tilta-orig': 'Tilta ring Nucleus-M II (original)' };
 
   // ARRI-ring op de ARRI WCU-4 (standaardmaat, gemeten aan een bestaand labelvel op 300 dpi).
   var RINGS = {
@@ -700,7 +700,7 @@ var Engine = (function () {
     // Tilta ARRI-ring: ARRI-maat ring op de Tilta ARRI-adapter van de Nucleus-M II (niet de originele Nucleus-ring).
     // Volgens Stefan: 252 mm sluit het mooist, recht; nudge 4 mm diep en 3,3 mm breed, ingang zonder afronding;
     // beste resultaat op Dulens 21 mm: schaal 24,5 en ∞ 7,2 mm vanaf het midden van de nudge.
-    // Die meting legt één punt van de ring vast: motorwaarde 9985 (∞ van de Dulens 21) ligt 7,2 mm onder de nudge.
+    // Die meting legt één punt van de ring vast: motorwaarde 9707 (∞ van de Dulens 21) ligt 7,2 mm onder de nudge.
     // Elke andere lens, van elk merk, volgt daaruit met zijn eigen .tl-waarden (gecontroleerd op Dulens, ARRI en Thypoch).
     // Daarom staat ∞ hier altijd per lens (lockInf) en hoort de meting vast bij dit profiel.
     'tilta-nucleus': {
@@ -708,7 +708,18 @@ var Engine = (function () {
       W: 19.39, top: -9.48, length: 252, corner: 0.9,
       notch: { h: 1.65, depth: 4.0, fillet: 0 },
       mmPer1000: 24.5, offset: 7.2, radius: 0, endZone: 10, zeroRef: 'center', infMode: 'lens',
-      anchorFv: 9985, anchorLabel: 'Dulens 21 mm', lockInf: true
+      anchorFv: 9707, anchorLabel: 'Dulens 21 mm', lockInf: true
+    },
+    // Originele Tilta-ring van de Nucleus-M II (de kleinere ring die erbij zit). Gemeten door Stefan op de Dulens 21 mm,
+    // vanaf de onderkant van de nudge: ∞ 81, 2 m 102, 1,5 m 110, 0,75 m 145, 0,30 m 61 mm (rondom). Het label (11 × 225 mm)
+    // begint tegen de nudge, zonder uitsparing. De schaal loopt rond de nudge door (circ = omtrek): de korte afstanden
+    // komen bovenaan, tussen de nudge en ∞. Schaal = 24,5 × 225/252: hetzelfde wiel, een kleinere ring (past op alle vijf metingen).
+    'tilta-orig': {
+      label: 'Tilta-ring Nucleus-M II (origineel)',
+      W: 11, top: 0, length: 225, corner: 0.9,
+      notch: { h: 0, depth: 0, fillet: 0 },
+      mmPer1000: 21.88, offset: 80.4, radius: 0, endZone: 0, zeroRef: 'bottom', infMode: 'lens',
+      anchorFv: 9707, anchorLabel: 'Dulens 21 mm', lockInf: true, circ: 225, textInGap: true
     }
   };
 
@@ -1044,22 +1055,25 @@ var Engine = (function () {
     if ((v = pick('endZone', 0, 60)) !== null) r.endZone = v;
     if ((v = pick('mmPer1000', 1, 100)) !== null) r.mmPer1000 = v;
     if ((v = pick('length', 150, 320)) !== null) r.length = v;
-    if ((v = pick('width', 12, 30)) !== null) r.W = v;
+    if ((v = pick('width', 8, 30)) !== null) r.W = v;
+    r.circ = base.circ ? r.length : 0;          // schaal loopt rond: periode = lengte van het label
+    r.textInGap = !!base.textInGap;
     // afgeronde hoeken van het label (straal in mm), boven = kant van de nudge; cornerRadii begrenst ze
     r.cornerTop = (v = pick('cornerTop', 0, 13)) !== null ? v : r.corner;
     r.cornerBottom = (v = pick('cornerBottom', 0, 13)) !== null ? v : r.corner;
-    if ((v = pick('notchDepth', 1, 12)) !== null) r.notch.depth = v;
-    if ((v = pick('notchWidth', 1, 8)) !== null) r.notch.h = v / 2;
+    if ((v = pick('notchDepth', 0, 12)) !== null) r.notch.depth = v;
+    if ((v = pick('notchWidth', 0, 8)) !== null) r.notch.h = v / 2;
     if ((v = pick('notchFillet', 0, 4)) !== null) { r.notch.ft = v; r.notch.fb = v; }
     if ((v = pick('notchFilletTop', 0, 4)) !== null) r.notch.ft = v;
     if ((v = pick('notchFilletBottom', 0, 4)) !== null) r.notch.fb = v;
-    r.notch.h = Math.min(r.notch.h, r.notch.depth);
+    r.notch.h = r.notch.depth > 0 ? Math.min(r.notch.h, r.notch.depth) : r.notch.h;
     r.notch.ft = Math.max(0, Math.min(r.notch.ft, r.notch.depth - r.notch.h, -r.top - r.corner - r.notch.h - 0.2));
     r.notch.fb = Math.max(0, Math.min(r.notch.fb, r.notch.depth - r.notch.h));
     r.notch.fillet = Math.max(r.notch.ft, r.notch.fb);
     // nulpunt voor de ∞-afstand: midden, bovenrand (kant van de tekst bovenaan) of onderrand (kant van ∞)
     r.zeroV = r.zeroRef === 'top' ? -r.notch.h : r.zeroRef === 'bottom' ? r.notch.h : 0;
-    if ((v = pick('offset', -20, 60)) !== null) r.offset = r.zeroV + v;
+    // ringen die rondlopen (originele Tilta-ring) hebben ∞ ver van de nudge; anders blijft de oude grens
+    if ((v = r.circ ? pick('offset', 0, r.length) : pick('offset', -20, 60)) !== null) r.offset = r.zeroV + v;
     r.offsetInput = r.offset - r.zeroV;
     r.bottom = r.top + r.length;
     r.unit = r.mmPer1000 / 1000;
@@ -1103,7 +1117,7 @@ var Engine = (function () {
   // werkelijke hoekstralen: nooit breder dan het label, en bovenaan niet tot in de nudge
   function cornerRadii(ring) {
     var t = ring.cornerTop !== undefined ? ring.cornerTop : ring.corner, b = ring.cornerBottom !== undefined ? ring.cornerBottom : ring.corner;
-    var maxT = Math.max(0, Math.min(ring.W / 2, -ring.top - ring.notch.h - ring.notch.ft - 0.2));
+    var maxT = ring.notch.depth > 0 ? Math.max(0, Math.min(ring.W / 2, -ring.top - ring.notch.h - ring.notch.ft - 0.2)) : ring.W / 2;
     return { top: clamp(t, 0, maxT), bottom: clamp(b, 0, ring.W / 2), maxTop: maxT, maxBottom: ring.W / 2 };
   }
   // hoe ver tekst van de bovenkant (of onderkant) af moet om binnen een hoek met straal r te blijven,
@@ -1117,6 +1131,14 @@ var Engine = (function () {
     var W = ring.W, T = ring.top, B = ring.bottom, h = ring.notch.h, D = ring.notch.depth, rfB = ring.notch.fb, rfT = ring.notch.ft;
     var rt = radii ? radii.top : ring.corner, rb = radii ? radii.bottom : ring.corner;
     var nt = Math.max(6, Math.ceil(rt * 5)), nb = Math.max(6, Math.ceil(rb * 5));
+    if (!(D > 0)) {   // geen uitsparing: gewone afgeronde rechthoek
+      var q = [[rt, T]];
+      q = q.concat(linePts(rt, T, W - rt, T, 3), arcPts(W - rt, T + rt, rt, -90, 0, nt), linePts(W, T + rt, W, B - rb, 2),
+        arcPts(W - rb, B - rb, rb, 0, 90, nb), linePts(W - rb, B, rb, B, 3), arcPts(rb, B - rb, rb, 90, 180, nb),
+        linePts(0, B - rb, 0, T + rt, 2), arcPts(rt, T + rt, rt, 180, 270, nt));
+      q.pop();
+      return q;
+    }
     var p = [[rt, T]];
     p = p.concat(linePts(rt, T, W - rt, T, 3));
     p = p.concat(arcPts(W - rt, T + rt, rt, -90, 0, nt));
@@ -1146,7 +1168,25 @@ var Engine = (function () {
   }
 
   // ---------- schaal + labelindeling ----------
-  function layoutLens(lens, ring) {
+  // smal label (bijv. de originele Tilta-ring, 11 mm): tekst iets kleiner, en links/rechts mogen elkaar niet raken
+  function withScale(ring, fn) {
+    var k = Math.max(0.75, Math.min(1, ring.W / 19.39 + 0.2));
+    if (L.__k || k >= 0.999) return fn();
+    var L0 = L, sc = {};
+    ['rCap', 'rSup', 'lCap', 'lSup', 'focalCap', 'focalTop', 'tstopCap', 'tstopMin', 'nameCap', 'infH', 'tickPastBand', 'labelPastBand'].forEach(function (key) { sc[key] = L0[key] * k; });
+    L = Object.assign({}, L0, sc, { __k: k });
+    try { return fn(); } finally { L = L0; }
+  }
+  function layoutLens(lens, ring, lopts) { return withScale(ring, function () { return layoutLens0(lens, ring, lopts); }); }
+  function layoutLens0(lens, ring, lopts) {
+    var narrow = ring.W < 16, blocks = (lopts && lopts.block) || [];
+    var lX = lopts && lopts.labelX !== undefined ? lopts.labelX : 6, rE = lopts && lopts.rEdge !== undefined ? lopts.rEdge : ring.W - 1;
+    // botsen = zowel verticaal als horizontaal overlappen (vakken: [boven, onder, links, rechts])
+    var hits = function (a0, a1, u0, u1, list, m) {
+      for (var i = 0; i < list.length; i++) { var b = list[i]; if (a1 + m > b[0] && a0 - m < b[1] && u1 + 0.3 > b[2] && u0 - 0.3 < b[3]) return true; }
+      return false;
+    };
+    var rightBoxes = [];
     var pts = [];
     for (var i = 0; i < lens.focus.length; i++) {
       var d = distOf(lens.focus[i]);
@@ -1159,20 +1199,37 @@ var Engine = (function () {
     var anchor = ring.infMode === 'lens' && ring.anchorFv !== null ? ring.anchorFv : own;
     var vOf = function (fv) { return ring.offset + (anchor - fv) * ring.unit; };
     var vLimit = ring.bottom - ring.endZone;
-    pts.forEach(function (p) { p.v = vOf(p.fv); });
-    var data = pts.filter(function (p) { return p.d !== Infinity && p.v <= vLimit && p.v > ring.top + 2; });
-    var cut = pts.filter(function (p) { return p.d !== Infinity && p.v > vLimit; });
+    var C = ring.circ || 0;
+    // rondlopende schaal: voorbij het eind van het label verder bovenaan (tot vlak voor ∞)
+    var wrapMax = inf ? vOf(inf.fv) - L.lineMajor / 2 - L.infGap - L.infH - 1.0 : ring.bottom;
+    pts.forEach(function (p) {
+      p.raw = vOf(p.fv); p.v = p.raw; p.wrap = false;
+      if (C && p.d !== Infinity && p.raw > ring.bottom - 0.5) { p.v = p.raw - C; p.wrap = true; }
+    });
+    var onLabel = function (p) { return p.wrap ? (p.v > ring.top + 2 && p.v < wrapMax) : (p.v <= vLimit && p.v > ring.top + 2); };
+    var data = pts.filter(function (p) { return p.d !== Infinity && onLabel(p); });
+    var cut = pts.filter(function (p) { return p.d !== Infinity && !onLabel(p) && (p.wrap || p.v > vLimit); });
 
-    var res = { inf: inf ? { v: inf.v } : null, data: [], minors: [], cut: cut, vLimit: vLimit, vOf: vOf };
+    var res = { inf: inf ? { v: inf.v } : null, data: [], minors: [], cut: cut, vLimit: vLimit, vOf: vOf, wrapTop: null };
     var lastLong = inf ? inf.v : -Infinity;
     var leftBoxes = [], lastLeftBottom = -Infinity;
     var ov = lens.overrides || {};
+    // eerst het rondgelopen stuk bovenaan (van boven naar beneden), dan vanaf ∞ naar beneden
+    var wrapped = data.filter(function (p) { return p.wrap; }).sort(function (a, b) { return a.v - b.v; });
+    var order = wrapped.concat(data.filter(function (p) { return !p.wrap; }));
+    if (wrapped.length) lastLong = -Infinity;
+    var placed = {};
 
-    data.forEach(function (p) {
+    order.forEach(function (p, idx) {
+      if (wrapped.length && idx === wrapped.length) { lastLong = inf ? inf.v : -Infinity; leftBoxes = []; lastLeftBottom = -Infinity; }
       var rTop = p.v - L.lineMajor / 2 - L.baseGap - L.rCap;
       var lTop = p.v - L.leftLabelLift - L.lCap / 2, lBot = lTop + L.lCap;
+      var spl = narrow ? splitLabel(p.text) : null;
+      var wR = narrow ? textWidth(spl.big, 700, L.rCap, 0.05) + (spl.sup ? textWidth(spl.sup, 700, L.rSup, 0.03) + 0.1 : 0) : 0;
+      var wL = narrow ? textWidth(spl.big, 400, L.lCap, 0.05) + (spl.sup ? textWidth(spl.sup, 400, L.lSup, 0.03) + 0.1 : 0) : 0;
       function fitsRight() {
         if (rTop < lastLong + L.lineMajor / 2 + L.gapR) return false;
+        if (narrow && (hits(rTop, p.v, rE - wR, rE, blocks, 0.4) || hits(rTop, p.v, rE - wR, rE, leftBoxes.map(function (b) { return [b.top, b.bottom, b.u0, b.u1]; }), 0.3))) return false;
         for (var k = 0; k < leftBoxes.length; k++) {
           var b = leftBoxes[k];
           if (p.v + L.lineMajor / 2 + L.lineClear > b.top && p.v - L.lineMajor / 2 - L.lineClear < b.bottom) return false;
@@ -1183,6 +1240,7 @@ var Engine = (function () {
         if (lTop < lastLong + L.lineMajor / 2 + L.lineClear) return false;
         if (lTop < lastLeftBottom + L.gapL) return false;
         if (lBot > ring.bottom - 1) return false;
+        if (narrow && (hits(lTop, lBot, lX, lX + wL, rightBoxes, 0.3) || hits(lTop, lBot, lX, lX + wL, blocks, 0.4))) return false;
         return true;
       }
       var want = ov[p.text], place = 'none', conflict = false;
@@ -1196,10 +1254,12 @@ var Engine = (function () {
           if (prefer[k] === 'right' ? fitsRight() : fitsLeft()) { place = prefer[k]; break; }
         }
       }
-      if (place === 'right') lastLong = p.v;
-      if (place === 'left') { leftBoxes.push({ top: lTop, bottom: lBot }); lastLeftBottom = lBot; }
-      res.data.push({ text: p.text, d: p.d, fv: p.fv, v: p.v, place: place, auto: !want, conflict: conflict });
+      if (place === 'right') { lastLong = p.v; rightBoxes.push([rTop, p.v - L.lineMajor / 2, rE - wR, rE]); }
+      if (place === 'left') { leftBoxes.push({ top: lTop, bottom: lBot, u0: lX, u1: lX + wL }); lastLeftBottom = lBot; }
+      placed[p.text] = { text: p.text, d: p.d, fv: p.fv, v: p.v, place: place, auto: !want, conflict: conflict, wrap: p.wrap };
+      if (p.wrap) res.wrapTop = Math.max(res.wrapTop === null ? -Infinity : res.wrapTop, place === 'left' ? Math.max(lBot, p.v + L.lineMajor / 2) : p.v + L.lineMajor / 2);
     });
+    data.forEach(function (p) { res.data.push(placed[p.text]); });   // volgorde blijft van ver naar dichtbij
 
     // tussenstreepjes: interpolatie lineair in 1/afstand tussen de lenspunten
     var STEPS = [10, 5, 2, 1, 0.5, 0.25, 0.1, 0.05, 0.025, 0.01];
@@ -1218,16 +1278,18 @@ var Engine = (function () {
           if (val <= b.d + 1e-9 || val >= a.d - 1e-9) continue;
           if (dataD.some(function (x) { return Math.abs(x - val) < 1e-9; })) continue;
           var t = (1 / val - 1 / a.d) / (1 / b.d - 1 / a.d);
-          cand.push({ d: val, v: a.v + t * (b.v - a.v) });
+          var vr = a.raw + t * (b.raw - a.raw);
+          if (C && vr > ring.bottom - 0.5) { vr -= C; if (vr <= ring.top + 1 || vr >= wrapMax) continue; }
+          cand.push({ d: val, v: vr, r: a.raw + t * (b.raw - a.raw) });
         }
         if (!cand.length) continue;
         if (cand.length > L.minorMax) break;
-        var vs = [a.v].concat(cand.map(function (c) { return c.v; })).concat([b.v]).sort(function (x, y) { return x - y; });
+        var vs = [a.raw].concat(cand.map(function (c) { return c.r; })).concat([b.raw]).sort(function (x, y) { return x - y; });
         var ok = true;
         for (var q = 1; q < vs.length; q++) if (vs[q] - vs[q - 1] < L.minorGap) { ok = false; break; }
         if (ok) { best = cand; break; }
       }
-      if (best) best.forEach(function (c) { if (c.v <= vLimit) res.minors.push(c); });
+      if (best) best.forEach(function (c) { if (c.v <= vLimit) res.minors.push({ d: c.d, v: c.v }); });
     }
     return res;
   }
@@ -1247,7 +1309,7 @@ var Engine = (function () {
   function zoneGeom(style, ring) {
     var W = ring.W;
     var bl = clamp(style.bandL, 0, W / 2), br = clamp(style.bandR, 0, W / 2);
-    var sp = clamp(style.split, bl + 0.5, W - br - 0.5);
+    var sp = clamp(style.split * W / 19.39, bl + 0.5, W - br - 0.5);   // grens in verhouding tot een standaardlabel
     if (style.fullFill) return { bandL: bl, bandR: br, split: W, full: true,
       zones: [
         { key: 'left', u0: -1, u1: W + 1, ua: 0, ub: W },
@@ -1313,11 +1375,18 @@ var Engine = (function () {
   }
 
   // ---------- strook opbouwen ----------
-  function buildStrip(lens, ring, style, x0, y0, opts) {
+  function buildStrip(lens, ring, style, x0, y0, opts) { return withScale(ring, function () { return buildStrip0(lens, ring, style, x0, y0, opts); }); }
+  function buildStrip0(lens, ring, style, x0, y0, opts) {
     opts = opts || {};
     style = normalizeStyle(style);
     var T = makeT(x0, y0, ring.radius);
-    var lay = layoutLens(lens, ring);
+    var zg0 = zoneGeom(style, ring), nameR0 = Math.max(L.nameRight, zg0.bandR + 0.6);
+    var nameStr0 = opts.lensText === false ? '' : (String(lens.bottomText || '').trim() || autoBottom(lens)), block = [];
+    if (nameStr0) {   // waar de lensnaam onderaan komt: op een smal label blijven de getallen daar weg
+      var nl0 = textWidth(nameStr0, 400, L.nameCap, L.nameTrack), vS0 = ring.bottom - Math.max(L.nameBottom, cornerDepth(cornerRadii(ring).bottom, nameR0 - 0.3));
+      block.push([vS0 - nl0 - 0.6, vS0 + 0.6, ring.W - nameR0 - L.nameCap, ring.W - nameR0]);
+    }
+    var lay = layoutLens0(lens, ring, { block: block, labelX: zg0.bandL + L.labelPastBand, rEdge: ring.W - Math.max(L.rightMargin, zg0.bandR + 0.6) });
     var W = ring.W, items = [], ink = style.ink;
     var radii = cornerRadii(ring);
     var outline = mapContour(polyCmds(outlineLocal(ring, radii)), T);
@@ -1354,9 +1423,16 @@ var Engine = (function () {
     var top = String(lens.topText || '').trim(), topBase0 = ring.top + L.focalTop + L.focalCap, topBase = topBase0;
     // blok van x0 tot x1: zo ver omlaag dat het binnen de afgeronde hoeken blijft
     var dropFor = function (x0, x1) { return topBase0 + Math.max(0, cornerDepth(radii.top, Math.min(x0, W - x1) - 0.3) - L.focalTop); };
+    // rondlopende schaal: het blok komt midden in het gat tussen het laatste rondgelopen getal en het ∞-teken
+    var gapLo = (lay.wrapTop !== null ? lay.wrapTop : ring.top) + 1.0;
+    var gapHi = lay.inf ? lay.inf.v - L.lineMajor / 2 - L.infGap - L.infH - 0.8 : ring.top + 20;
+    var baseFor = function (x0, x1, h) {
+      if (!ring.textInGap) return dropFor(x0, x1);
+      return (gapLo + gapHi) / 2 - h / 2 + L.focalCap;
+    };
     if (top) {
       var tw = textWidth(top, 700, L.focalCap, 0.1), tx0 = W / 2 + L.focalShift - tw / 2;
-      topBase = dropFor(tx0, tx0 + tw);
+      topBase = baseFor(tx0, tx0 + tw, L.focalCap);
       text(top, 700, L.focalCap, tx0, topBase, 0.1);
     } else if (lens.focal) {
       // automatisch: groot brandpunt met de T-stop erachter (zonder "mm").
@@ -1374,12 +1450,12 @@ var Engine = (function () {
       }
       if (!tsS || wb + gT + wt <= lim1 - lim0) {
         var one = wb + (tsS ? gT + wt : 0), x = place(one);
-        topBase = dropFor(x, x + one);
+        topBase = baseFor(x, x + one, L.focalCap);
         text(big, 700, L.focalCap, x, topBase, 0.1);
         if (tsS) text(tsS, 700, sCap, x + wb + gT, topBase, 0.04);
       } else {
         var xb = place(wb), mid = xb + wb / 2;
-        topBase = dropFor(xb, xb + wb);
+        topBase = baseFor(xb, xb + wb, L.focalCap + 0.8 + L.tstopMin);
         text(big, 700, L.focalCap, xb, topBase, 0.1);
         sCap = L.tstopMin; wt = textWidth(tsS, 700, sCap, 0.04);
         text(tsS, 700, sCap, mid - wt / 2, topBase + 0.8 + sCap, 0.04);
@@ -1434,7 +1510,10 @@ var Engine = (function () {
     var ring = ringFor(job.ring);
     var style = normalizeStyle(job.style);
     var lenses = (job.lenses || []).filter(function (l) { return l.include !== false; });
-    var pages = [], n = Math.max(1, Math.ceil(lenses.length / PAGE.perPage));
+    // smalle labels: dichter op elkaar en meer per vel (standaardlabel: 7 per vel, zoals altijd)
+    var pitch = ring.W >= 19 ? PAGE.pitch : Math.max(ring.W + 7, 12);
+    var perPage = ring.W >= 19 ? PAGE.perPage : Math.max(1, Math.floor((210 - 2 * PAGE.firstX + (pitch - ring.W)) / pitch));
+    var pages = [], n = Math.max(1, Math.ceil(lenses.length / perPage));
     var dateStr = opts.date || '';
     for (var p = 0; p < n; p++) {
       var page = { items: [], strips: [] };
@@ -1464,8 +1543,8 @@ var Engine = (function () {
       shapes.push(textContours(say('0 TOT 10 OP DE LINIAAL = PRECIES 100 MM', '0 TO 10 ON THE RULER = EXACTLY 100 MM'), 400, 1.6, 0.1, function (fx, fy) { return [rx + 110 + fx, ry + 5.3 - fy]; }));
       page.items.push({ fill: ink, contours: shapes });
 
-      lenses.slice(p * PAGE.perPage, (p + 1) * PAGE.perPage).forEach(function (lens, k) {
-        var x0 = PAGE.firstX + k * PAGE.pitch, y0 = PAGE.stripTop - ring.top;
+      lenses.slice(p * perPage, (p + 1) * perPage).forEach(function (lens, k) {
+        var x0 = PAGE.firstX + k * pitch, y0 = PAGE.stripTop - ring.top;
         var st = buildStrip(lens, ring, style, x0, y0, { minors: job.minors !== false, lensText: job.lensText !== false, topExtra: job.topExtra !== false });
         // omlijning: binnen = op het label, center = half op de snijlijn, out = buiten het label
         var ol = style.outline, sitems = st.items.slice();
@@ -2014,6 +2093,8 @@ var I18N = (function () {
     'Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.': 'Tilta ARRI ring: an ARRI-size ring on the Tilta ARRI adapter of the Nucleus-M II, not the Tilta ring that comes with it.',
     'Tilta ARRI-ring op Nucleus-M II': 'Tilta ARRI ring on Nucleus-M II',
     'ARRI WCU-4-ring': 'ARRI WCU-4 ring',
+    'Tilta-ring Nucleus-M II (origineel)': 'Tilta ring Nucleus-M II (original)',
+    '0 = geen uitsparing': '0 = no cutout',
     'Mijn ring': 'My ring',
     'Mijn opgeslagen standaard': 'My saved default',
     'Meetlabel': 'Calibration label',
@@ -2197,6 +2278,8 @@ var I18N = (function () {
     [/^Kies een lens in (.+) om de strook te bekijken\.$/, 'Choose a lens in $1 to view the strip.'],
     [/^Uitsparing (.+) × (.+) mm\. ∞ ligt (.+) mm onder (het midden|de bovenrand|de onderrand) van de nudge\.$/,
       function (m) { return 'Cutout ' + m[1] + ' × ' + m[2] + ' mm. ∞ is ' + m[3] + ' mm below ' + REF_EN[m[4]] + ' of the nudge.'; }],
+    [/^Geen uitsparing\. ∞ ligt (.+) mm onder (het midden|de bovenrand|de onderrand) van de nudge\.$/,
+      function (m) { return 'No cutout. ∞ is ' + m[1] + ' mm below ' + REF_EN[m[2]] + ' of the nudge.'; }],
     [/^(.*) {2}\(automatisch\)$/, '$1  (automatic)'],
     [/^(\d+) afstanden$/, '$1 distances'],
     [/^(\d+) tussenstreepjes$/, '$1 minor ticks'],
@@ -2398,7 +2481,7 @@ function newFolder(name, key, presetKey) {
 var JIG_FILE = 'Focusringlabels_mal_Tilta-ARRI-ring.stl';
 var JIG_URL = (window.__PWA__ ? '' : 'https://stefanspoelstra.github.io/focusringlabels/') + 'mal/' + JIG_FILE;
 function isTiltaRing(prof) { return !!(prof && prof.ring && Engine.presetKey(prof.ring.preset) === 'tilta-nucleus'); }
-var TEMPLATE_NAMES = { 'tilta-nucleus': T('Tilta ARRI-ring op Nucleus-M II'), 'arri-wcu4': T('ARRI WCU-4-ring') };
+var TEMPLATE_NAMES = { 'tilta-nucleus': T('Tilta ARRI-ring op Nucleus-M II'), 'tilta-orig': T('Tilta-ring Nucleus-M II (origineel)'), 'arri-wcu4': T('ARRI WCU-4-ring') };
 // v17: oude profielnamen en sleutels van de ARRI-ring opschonen
 function migr17(j) {
   if (j.migr >= 17) return;
@@ -2409,6 +2492,18 @@ function migr17(j) {
     if (old.test(n)) x.name = n.replace(/ARRI-ring\s*\([^)]*\)/i, 'ARRI WCU-4-ring').replace(/\s*\([^)]*ring\s*-?\s*thing[^)]*\)/ig, '').replace(old, 'ARRI WCU-4').trim() || 'ARRI WCU-4-ring';
   });
   j.migr = 17;
+}
+// v39: de vaste ∞-meting van de Tilta ARRI-ring hoort bij Stefans echte Dulens 21 mm (∞ = 9707), niet bij 9985
+// (dat kwam uit een testbestand). Zo staat het weer precies zoals het getest is. Plus het profiel voor de originele Tilta-ring.
+function migr39(j) {
+  if (j.migr >= 39) return;
+  (j.profiles || []).forEach(function (x) {
+    var rs = x.ring || {};
+    if (Engine.presetKey(rs.preset) === 'tilta-nucleus' && Number(rs.anchorFv) === 9985) { rs.anchorFv = 9707; rs.anchorLabel = 'Dulens 21 mm'; }
+  });
+  if (!(j.profiles || []).some(function (x) { return x.ring && Engine.presetKey(x.ring.preset) === 'tilta-orig'; }))
+    (j.profiles = j.profiles || []).push({ id: uid('p'), name: TEMPLATE_NAMES['tilta-orig'], ring: Engine.snapshotRing({ preset: 'tilta-orig' }) });
+  j.migr = 39;
 }
 // v33: geen voorbeeldlens meer. Een bibliotheek met alléén de oude voorbeeldlens (Dulens 85 mm) gaat terug naar
 // het startscherm; de map blijft, met opmaak en profiel, maar heet weer 'Lenzen'. Staan er meer lenzen in, dan blijft
@@ -2439,7 +2534,7 @@ function migr31(j) {
   if (j.defaults && j.defaults.style) delete j.defaults.style.corners;
   j.migr = 31;
 }
-// v28: de ∞-meting van de Tilta ARRI-ring hoort bij de Dulens 21 mm (∞ = 9985). Profielen waar de standaard 7,2 mm
+// v28: de ∞-meting van de Tilta ARRI-ring hoort bij de Dulens 21 mm (sinds v39: ∞ = 9707). Profielen waar de standaard 7,2 mm
 // aan een andere lens hing (bijvoorbeeld de voorbeeldlens van 85 mm), gaan terug naar die meting. Een eigen meting blijft staan.
 function migr28(j) {
   if (j.migr >= 28) return;
@@ -2500,7 +2595,7 @@ function renderDefaults() {
   $('btnStyleDefault').textContent = styleIs ? 'Dit is je standaard' : 'Maak standaard';
 }
 function defaults() {
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 33, profiles: [], saved: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 39, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   // geen voorbeeldlens meer: één lege startmap, die het eerste merk overneemt (met opmaak en profiel die je al koos)
   var f = newFolder(T('Lenzen')); f.starter = true; P.folders.push(f);
@@ -2534,7 +2629,7 @@ function migrate(j) {
     j.defaults = j.defaults && typeof j.defaults === 'object' ? j.defaults : {};
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
-    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); migr33(j); P = save3;
+    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); migr33(j); migr39(j); P = save3;
     j.saved = (Array.isArray(j.saved) ? j.saved : []).filter(function (x) { return x && x.style; })
       .map(function (x) { return { id: x.id || uid('s'), name: String(x.name || 'Opmaak').slice(0, 40), style: Engine.normalizeStyle(x.style) }; });
     return j;
@@ -2553,7 +2648,7 @@ function migrate(j) {
   });
   if (!P.folders.length) { var nf = newFolder(old.name || 'Lenzen'); nf.style = clone(style); P.folders.push(nf); }
   P.active = P.folders[0].id;
-  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P); migr33(P);
+  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P); migr33(P); migr39(P);
   var out = P; P = save2;
   return out;
 }
@@ -2587,7 +2682,7 @@ function folderForBrand(name) {
 function loadExample() {
   var j = clone(SAMPLE_TL), name = T('Voorbeeld');
   j.brand = name; j.series = ''; j.focal_length = '50';
-  for (var i = 0; i < j.focus.length; i++) if (String(j.focus[i]).trim().toUpperCase() === 'INF') j.fv[i] = 9985;
+  for (var i = 0; i < j.focus.length; i++) if (String(j.focus[i]).trim().toUpperCase() === 'INF') j.fv[i] = 9707;
   var l = Engine.parseLensFile(JSON.stringify(j), name + ' 50.tl');
   l.brandName = name;
   var f = fileLens(l); f.open = true; P.active = f.id; sel = l.id; changed();
@@ -3173,14 +3268,14 @@ function buildRingSliders() {
   // label: maten, uitsparing voor de nudge en afgeronde hoeken
   var size = [
     s('length', 'Lengte', 'korter = minder overlap', 200, 270, 0.1),
-    s('width', 'Breedte', 'hoogte van de ring', 14, 26, 0.05),
+    s('width', 'Breedte', 'hoogte van de ring', 8, 26, 0.05),
     sliderField({ id: 'radius', label: 'Kromming', hint: 'straal, 0 = recht', min: 0, max: 20000, step: 10, unit: 'mm', get: function () { return ringVal('radius'); }, set: function (v) { curRs().radius = v; } }),
     sliderField({ id: 'endZone', label: 'Lege zone onderaan', hint: '', min: 0, max: 40, step: 0.5, unit: 'mm', get: function () { return ringVal('endZone'); }, set: function (v) { curRs().endZone = v; } })
   ];
   size.forEach(function (x) { $('labelSizeSliders').appendChild(x); });
   var notch = [
-    s('notchDepth', 'Diepte', 'vanaf linkerrand', 2, 10, 0.05),
-    s('notchWidth', 'Breedte', 'langs de strook', 1.5, 7, 0.05),
+    s('notchDepth', 'Diepte', '0 = geen uitsparing', 0, 10, 0.05),
+    s('notchWidth', 'Breedte', 'langs de strook', 0, 7, 0.05),
     s('notchFilletTop', 'Afronding bovenkant', '0 = rechte hoek', 0, 4, 0.05),
     s('notchFilletBottom', 'Afronding onderkant', '0 = rechte hoek', 0, 4, 0.05)
   ];
@@ -3231,8 +3326,13 @@ $('anchorSel').addEventListener('change', function () {
   toast('Referentie: ' + rs.anchorLabel + '. De ∞-afstand geldt nu voor deze lens.');
 });
 function syncRingValues() {
+  var r = curRing();
+  // rondlopende schaal (originele Tilta-ring): ∞ ligt tientallen mm van de nudge, dus een ruimer bereik
+  [['r_offset', 'n_offset']].forEach(function (ids) {
+    ids.forEach(function (id) { var x = $(id); if (!x) return; x.min = r.circ ? 0 : -5; x.max = r.circ ? Math.round(r.length) : 20; });
+  });
   ringSliders.forEach(function (s) { s._show(); });
-  var r = curRing(), em = ringSliders[0] && ringSliders[0].querySelector('em');
+  var em = ringSliders[0] && ringSliders[0].querySelector('em');
   if (em) em.textContent = (!r.lockInf && r.infMode === 'lens' && r.anchorFv !== null ? '∞ ' + (r.anchorLabel || 'referentie') + ', ' : '') + REF_HINT[r.zeroRef];
   renderAnchor();
   renderCornerInfo();
@@ -3482,7 +3582,8 @@ function closeupSVG(l) {
   var pg = pagesFor(f), strip = null, page = null;
   pg.forEach(function (p) { p.strips.forEach(function (s) { if (s.lensId === l.id) { strip = s; page = p; } }); });
   if (!strip) return '';
-  var r = strip.ring, a = strip.T(-2, r.top - 4.5), b = strip.T(r.W + 2, Math.max(r.offset, 0) + 9);
+  // uitsnede: bovenkant met de nudge; bij een rondlopende schaal het stuk rond ∞ met het brandpunt erboven
+  var r = strip.ring, a = strip.T(-2, r.textInGap ? Math.max(r.top - 1, r.offset - 22) : r.top - 4.5), b = strip.T(r.W + 2, r.textInGap ? r.offset + 12 : Math.max(r.offset, 0) + 9);
   var vb = [a[0], a[1], b[0] - a[0], b[1] - a[1]];
   var svg = Engine.pageSVG(page, { idPrefix: 'cu', fluid: true, viewBox: vb.map(function (x) { return Math.round(x * 1000) / 1000; }) });
   // maatstreep 5 mm
@@ -3636,7 +3737,8 @@ function renderDetail() {
   var g = ring.notch;
   var refWord = { center: 'het midden', top: 'de bovenrand', bottom: 'de onderrand' }[ring.zeroRef];
   var infHere = lay.inf ? lay.inf.v - ring.zeroV : ring.offsetInput;
-  cu.appendChild(el('p', 'hint', 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ∞ ligt ' + dec(Math.round(infHere * 100) / 100) + ' mm onder ' + refWord + ' van de nudge.'));
+  var infTxt = '∞ ligt ' + dec(Math.round(infHere * 100) / 100) + ' mm onder ' + refWord + ' van de nudge.';
+  cu.appendChild(el('p', 'hint', g.depth > 0 ? 'Uitsparing ' + fmtMM(g.depth) + ' × ' + fmtMM(g.h * 2) + ' mm. ' + infTxt : 'Geen uitsparing. ' + infTxt));
   if (isTiltaRing(profileOf(folderById(l.folderId)))) {
     var jl = el('a', 'btn small', 'Mal voor de Tilta ARRI-ring (STL)'); jl.href = JIG_URL; jl.target = '_blank'; jl.rel = 'noopener';
     if (window.__PWA__) jl.setAttribute('download', JIG_FILE);
@@ -4280,7 +4382,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '38 · ' + (LANG === 'en' ? '2026-10-14 · drag strips on the sheet' : '14-10-2026 · stroken op het vel slepen');
+var APP_VERSION = '39 · ' + (LANG === 'en' ? '2026-10-14 · original Tilta ring' : '14-10-2026 · originele Tilta-ring');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
