@@ -498,6 +498,12 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
         <h2>Lensdoppen</h2>
         <label class="check"><input type="checkbox" id="capsOn"> Stickers voor de lensdoppen meeprinten</label>
         <div class="stack" id="capsOpts">
+          <label class="field"><span>Vorm</span>
+            <select class="inp" id="capsShape">
+              <option value="square">Vierkant</option>
+              <option value="round">Rond</option>
+            </select>
+          </label>
           <div id="capsSlider"></div>
           <label class="field"><span>Per lens</span>
             <select class="inp" id="capsN">
@@ -505,7 +511,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
               <option value="2">2 stickers (voor- en achterdop)</option>
             </select>
           </label>
-          <p class="hint">In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Ze komen op een eigen vel na de stroken. Rond knippen gaat het snelst met een cirkelpons van dezelfde maat.</p>
+          <p class="hint">In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Ze komen op een eigen vel na de stroken. Vierkant staan ze tegen elkaar aan, dus je bent klaar met een paar rechte sneden. Rond gaat het snelst met een cirkelpons van dezelfde maat.</p>
         </div>
       </section>
       <details class="more" id="dZones">
@@ -1617,11 +1623,12 @@ var Engine = (function () {
   // geschaald tot de cirkel. Zo hoort een dop zichtbaar bij de lensset. Daarop het brandpunt, de T-stop en de lensnaam.
   function buildCap(lens, style, cx, cy, D, opts) {
     opts = opts || {};
-    var Wv = 19.39, k = D / Wv, R = D / 2;
+    var Wv = 19.39, k = D / Wv, R = D / 2, square = opts.shape !== 'round';
     var vring = { W: Wv, top: -Wv / 2, length: Wv, bottom: Wv / 2 };
     var T = function (u, v) { return [cx + (u - Wv / 2) * k, cy + v * k]; };
     var pts = [];
-    for (var i = 0; i < 180; i++) { var a = i / 180 * 2 * Math.PI; pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
+    if (square) pts = [[cx - R, cy - R], [cx + R, cy - R], [cx + R, cy + R], [cx - R, cy + R]];
+    else for (var i = 0; i < 180; i++) { var a = i / 180 * 2 * Math.PI; pts.push([cx + R * Math.cos(a), cy + R * Math.sin(a)]); }
     var clip = polyCmds(pts);
     var items = [];
     var zg = zoneGeom(style, vring);
@@ -1640,7 +1647,7 @@ var Engine = (function () {
     var H = (nm ? capN + gap : 0) + capB + (ts ? gap * 1.3 + capT : 0), y = cy - H / 2;
     var shapes = [];
     function line(s, w, cap, track, base) {
-      var hw = Math.sqrt(Math.max(0, R * R - Math.pow(base - cap / 2 - cy, 2))), maxW = 2 * hw - 0.14 * D;
+      var hw = square ? R : Math.sqrt(Math.max(0, R * R - Math.pow(base - cap / 2 - cy, 2))), maxW = 2 * hw - 0.14 * D;
       var tw = textWidth(s, w, cap, track);
       if (tw > maxW && tw > 0) { var f = maxW / tw; cap *= f; track *= f; tw = textWidth(s, w, cap, track); }
       var x = cx - tw / 2;
@@ -1656,10 +1663,12 @@ var Engine = (function () {
     opts = opts || {};
     var style = normalizeStyle(job.style);
     var D = clamp(Number(job.capD) || 40, 15, 120), per = Number(job.capCount) === 2 ? 2 : 1;
+    var shape = job.capShape === 'round' ? 'round' : 'square';
     var list = [];
     (job.lenses || []).filter(function (l) { return l.include !== false; }).forEach(function (l) { for (var i = 0; i < per; i++) list.push(l); });
     if (!list.length) return [];
-    var gap = 5, top = 22, bottom = 274;
+    // vierkant: tegen elkaar aan, zodat je met een paar lange rechte sneden klaar bent; rond: met ruimte voor een pons
+    var gap = shape === 'square' ? 0 : 5, top = 22, bottom = 274;
     var cols = Math.max(1, Math.floor((210 - 2 * PAGE.firstX + gap) / (D + gap)));
     var rows = Math.max(1, Math.floor((bottom - top + gap) / (D + gap)));
     var perPage = cols * rows, n = Math.ceil(list.length / perPage);
@@ -1667,16 +1676,18 @@ var Engine = (function () {
     var pages = [];
     for (var p = 0; p < n; p++) {
       var page = { items: [], strips: [], caps: true }, shapes = [];
-      var hdr = [job.name || 'Ringlabels', say('LENSDOPPEN', 'LENS CAPS'), 'Ø ' + fmt(D, 1) + ' MM', opts.date || '', n > 1 ? say('VEL ', 'SHEET ') + (p + 1) + '/' + n : '']
+      var hdr = [job.name || 'Ringlabels', say('LENSDOPPEN', 'LENS CAPS'), (shape === 'square' ? fmt(D, 1) + ' × ' + fmt(D, 1) : 'Ø ' + fmt(D, 1)) + ' MM', opts.date || '', n > 1 ? say('VEL ', 'SHEET ') + (p + 1) + '/' + n : '']
         .filter(Boolean).join('   ·   ').toUpperCase();
       shapes.push(textContours(hdr, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 12 - fy]; }));
-      shapes.push(textContours(say('KNIP LANGS DE RAND, OF GEBRUIK EEN CIRKELPONS VAN DEZE MAAT', 'CUT ALONG THE EDGE, OR USE A CIRCLE PUNCH OF THIS SIZE'), 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 15.2 - fy]; }));
+      var how = shape === 'square' ? say('SNIJ LANGS DE LIJNEN: EERST DE LANGE SNEDEN, DAN DE KORTE', 'CUT ALONG THE LINES: LONG CUTS FIRST, THEN THE SHORT ONES')
+        : say('KNIP LANGS DE RAND, OF GEBRUIK EEN CIRKELPONS VAN DEZE MAAT', 'CUT ALONG THE EDGE, OR USE A CIRCLE PUNCH OF THIS SIZE');
+      shapes.push(textContours(how, 400, 1.9, 0.12, function (fx, fy) { return [PAGE.firstX + fx, 15.2 - fy]; }));
       rulerShapes(shapes);
       page.items.push({ fill: '#222222', contours: shapes });
       list.slice(p * perPage, (p + 1) * perPage).forEach(function (lens, i) {
         var c = i % cols, r = Math.floor(i / cols);
         var cx = left + D / 2 + c * (D + gap), cy = top + D / 2 + r * (D + gap);
-        var cap = buildCap(lens, style, cx, cy, D, { lensText: job.lensText !== false, topExtra: job.topExtra !== false });
+        var cap = buildCap(lens, style, cx, cy, D, { lensText: job.lensText !== false, topExtra: job.topExtra !== false, shape: shape });
         var ol = style.outline, citems = cap.items.slice();
         if (ol.on && ol.pos === 'out') page.items.push({ stroke: ol.color, width: ol.width * 2, contours: [cap.clip] });
         if (ol.on && ol.pos === 'in') citems.push({ stroke: ol.color, width: ol.width * 2, contours: [cap.clip] });
@@ -2121,8 +2132,13 @@ var I18N = (function () {
     'Per lens': 'Per lens',
     '1 sticker': '1 sticker',
     '2 stickers (voor- en achterdop)': '2 stickers (front and rear cap)',
-    'In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Ze komen op een eigen vel na de stroken. Rond knippen gaat het snelst met een cirkelpons van dezelfde maat.':
-      'In the colours of the strips, with the focal length, T-stop and lens name (as ticked above). They go on their own sheet after the strips. A circle punch of the same size is the quickest way to cut them out.',
+    'In de kleuren van de stroken, met het brandpunt, de T-stop en de lensnaam (zoals hierboven aangevinkt). Ze komen op een eigen vel na de stroken. Vierkant staan ze tegen elkaar aan, dus je bent klaar met een paar rechte sneden. Rond gaat het snelst met een cirkelpons van dezelfde maat.':
+      'In the colours of the strips, with the focal length, T-stop and lens name (as ticked above). They go on their own sheet after the strips. Square ones sit right next to each other, so a few straight cuts and you are done. Round ones are quickest with a circle punch of the same size.',
+    'Vorm': 'Shape',
+    'Vierkant': 'Square',
+    'Rond': 'Round',
+    'Grootte': 'Size',
+    'breedte van de sticker': 'width of the sticker',
     'Kleurvlakken aanpassen': 'Edit color areas',
     'Eén vlak over het hele label': 'One area across the whole label',
     'Sierstrepen': 'Accent stripes',
@@ -3068,8 +3084,8 @@ var cache = {};
 var raf = 0;
 function changed() { cache = {}; persist(); if (!raf) raf = requestAnimationFrame(function () { raf = 0; render(); }); }
 // lensdoppen: één instelling voor alle mappen (net als de vinkjes onder Op het label)
-function capsCfg() { var c = (typeof P !== 'undefined' && P && P.caps) || {}; var d = Number(c.d); return { on: !!c.on, d: isFinite(d) && d >= 15 && d <= 120 ? d : 40, n: Number(c.n) === 2 ? 2 : 1 }; }
-function jobFor(f) { var c = capsCfg(); return { ring: ringRs(profileOf(f)), style: f.style, name: f.name, lenses: lensesOf(f.id), minors: P.minors !== false, lensText: P.lensText !== false, topExtra: P.topExtra !== false, capD: c.d, capCount: c.n }; }
+function capsCfg() { var c = (typeof P !== 'undefined' && P && P.caps) || {}; var d = Number(c.d); return { on: !!c.on, d: isFinite(d) && d >= 15 && d <= 120 ? d : 40, n: Number(c.n) === 2 ? 2 : 1, shape: c.shape === 'round' ? 'round' : 'square' }; }
+function jobFor(f) { var c = capsCfg(); return { ring: ringRs(profileOf(f)), style: f.style, name: f.name, lenses: lensesOf(f.id), minors: P.minors !== false, lensText: P.lensText !== false, topExtra: P.topExtra !== false, capD: c.d, capCount: c.n, capShape: c.shape }; }
 function pagesFor(f) {
   if (!cache[f.id]) {
     var job = jobFor(f), o = { date: today() };
@@ -4308,12 +4324,13 @@ $('btnStyleDefault').onclick = function () {
 $('minors').onchange = function () { P.minors = $('minors').checked; changed(); };
 $('lensText').onchange = function () { P.lensText = $('lensText').checked; changed(); };
 $('topExtra').onchange = function () { P.topExtra = $('topExtra').checked; changed(); };
-var capsSlider = sliderField({ id: 'capD', label: 'Doorsnede', hint: 'van de sticker', min: 20, max: 100, step: 0.5, unit: 'mm',
+var capsSlider = sliderField({ id: 'capD', label: 'Grootte', hint: 'breedte van de sticker', min: 20, max: 100, step: 0.5, unit: 'mm',
   get: function () { return capsCfg().d; }, set: function (v) { P.caps = Object.assign(capsCfg(), { d: v }); } });
 $('capsSlider').appendChild(capsSlider);
-function syncCaps() { var c = capsCfg(); $('capsOn').checked = c.on; $('capsOpts').hidden = !c.on; $('capsN').value = String(c.n); if (capsSlider) capsSlider._show(); }
+function syncCaps() { var c = capsCfg(); $('capsOn').checked = c.on; $('capsOpts').hidden = !c.on; $('capsN').value = String(c.n); $('capsShape').value = c.shape; if (capsSlider) capsSlider._show(); }
 $('capsOn').onchange = function () { P.caps = Object.assign(capsCfg(), { on: $('capsOn').checked }); changed(); syncCaps(); };
 $('capsN').onchange = function () { P.caps = Object.assign(capsCfg(), { n: Number($('capsN').value) }); changed(); };
+$('capsShape').onchange = function () { P.caps = Object.assign(capsCfg(), { shape: $('capsShape').value }); changed(); };
 $('pngDpi').onchange = function () { P.pngDpi = Number($('pngDpi').value); persist(); };
 $('folderName').addEventListener('input', function () { var f = activeFolder(); if (!f) return; f.name = $('folderName').value || f.name; delete f.starter; changed(); });
 $('folderName').addEventListener('blur', function () { var f = activeFolder(); if (f) $('folderName').value = f.name; });
@@ -4807,7 +4824,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '43 · ' + (LANG === 'en' ? '2026-10-14 · lens cap stickers' : '14-10-2026 · stickers voor lensdoppen');
+var APP_VERSION = '44 · ' + (LANG === 'en' ? '2026-10-14 · square lens cap stickers' : '14-10-2026 · vierkante lensdop-stickers');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
