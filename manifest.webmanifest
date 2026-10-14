@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Focusringlabels",
-  "short_name": "Ringlabels",
-  "description": "Focusringlabels voor de Tilta Nucleus-M II en ARRI WCU-4, gemaakt uit Tilta-lensbestanden.",
+  "name": "Pullmark – focus ring labels",
+  "short_name": "Pullmark",
+  "description": "Pullmark: focusringlabels voor de Tilta Nucleus-M II en ARRI WCU-4, uit Tilta-lensbestanden of zelf ingemeten.",
   "lang": "nl",
   "start_url": "./",
   "scope": "./",

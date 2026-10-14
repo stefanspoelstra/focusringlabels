@@ -1,12 +1,12 @@
-# Focusringlabels
+# Pullmark
 
-Web-app om focusringlabels te maken uit Tilta-lensbestanden (`.tl`), voor de Tilta ARRI-ring op de Nucleus-M II en voor de ARRI WCU-4.
+**Focusringlabels voor focuspullers.** Web-app om labels voor je focusring te maken uit Tilta-lensbestanden (`.tl`), of door een lens zelf in te meten. Voor de Tilta ARRI-ring en de originele Tilta-ring op de Nucleus-M II, en voor de ARRI WCU-4. Voorheen heette de app Focusringlabels.
 
 **Openen:** https://stefanspoelstra.github.io/focusringlabels/
 
 **Taal:** Nederlands of Engels. Kies met het wereldbolletje rechtsboven in de app.
 
-> **English:** a web app that makes focus ring labels from Tilta lens files (`.tl`), for the Tilta ARRI ring on the Nucleus-M II and the ARRI WCU-4. Open the link above; it starts in English unless your browser is set to Dutch. Switch language with the globe at the top right.
+> **English:** Pullmark is a web app that makes focus ring labels from Tilta lens files (`.tl`), or from a lens you measure yourself, for the Tilta ARRI ring and the original Tilta ring on the Nucleus-M II and the ARRI WCU-4. Open the link above; it starts in English unless your browser is set to Dutch. Switch language with the globe at the top right.
 
 ## Installeren op de Mac (Chrome)
 
@@ -28,7 +28,7 @@ Voor een lens zonder `.tl`-bestand, of een ander follow-focussysteem dan de Nucl
 
 ## Mal voor de Tilta ARRI-ring
 
-`mal/Focusringlabels_mal_Tilta-ARRI-ring.stl`: 3D-printbare mal om het label recht op de Tilta ARRI-ring te zetten. De nok past in de uitsparing van 4 × 3,3 mm. Print hem plat, zonder support, in PLA of PETG. Leg het label met de lijmkant boven in de goot en de uitsparing over de nok.
+`mal/Pullmark_mal_Tilta-ARRI-ring.stl`: 3D-printbare mal om het label recht op de Tilta ARRI-ring te zetten. De nok past in de uitsparing van 4 × 3,3 mm. Print hem plat, zonder support, in PLA of PETG. Leg het label met de lijmkant boven in de goot en de uitsparing over de nok.
 
 ## Bestanden
 
