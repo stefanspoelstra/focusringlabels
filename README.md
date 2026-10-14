@@ -30,6 +30,10 @@ Voor elke andere ring of handunit, bijvoorbeeld de ARRI WCU-4: kies het profiel 
 
 Voor een lens zonder `.tl`-bestand, of een ander follow-focussysteem dan de Nucleus-M II: kies **Lens inmeten**. Print het meetlabel, plak het om de ring en lees per afstand op de lens af hoeveel mm hij van de nudge ligt. De app zet de streepjes precies op die plekken en rekent de tussenstreepjes ertussen uit (lineair in 1/afstand). Omdat je op de ring zelf meet, maken het systeem, de lensdata en de motorwaarden niet uit. De metingen horen wel bij de ring waarop je ze deed.
 
+## Lensdoppen
+
+Onder **Opmaak › Lensdoppen** print je ook ronde stickers voor je lensdoppen: het brandpunt groot, met de T-stop en de lensnaam, in dezelfde kleuren als de stroken van die map. Kies de doorsnede (20 tot 100 mm) en 1 of 2 stickers per lens (voor- en achterdop). Ze komen op een eigen vel na de stroken. Rond knippen gaat het snelst met een cirkelpons van dezelfde maat.
+
 ## Mal voor de Tilta ARRI-ring
 
 `mal/Pullmark_mal_Tilta-ARRI-ring.stl`: 3D-printbare mal om het label recht op de Tilta ARRI-ring te zetten. De nok past in de uitsparing van 4 × 3,3 mm. Print hem plat, zonder support, in PLA of PETG. Leg het label met de lijmkant boven in de goot en de uitsparing over de nok.
