@@ -1,12 +1,12 @@
 # Pullmark
 
-**Focusringlabels voor focuspullers.** Web-app om labels voor je focusring te maken uit Tilta-lensbestanden (`.tl`), of door een lens zelf in te meten. Voor de Tilta ARRI-ring en de originele Tilta-ring op de Nucleus-M II, en voor de ARRI WCU-4. Voorheen heette de app Focusringlabels.
+**Focusringlabels voor focuspullers.** Web-app om labels voor je focusring te maken uit Tilta-lensbestanden (`.tl`), of door een lens zelf in te meten. Kant-en-klaar voor de Tilta ARRI-ring en de originele Tilta-ring op de Nucleus-M II; elke andere ring (bijvoorbeeld de ARRI WCU-4) meet je zelf in met het meetlabel. Voorheen heette de app Focusringlabels.
 
 **Openen:** https://stefanspoelstra.github.io/focusringlabels/
 
 **Taal:** Nederlands of Engels. Kies met het wereldbolletje rechtsboven in de app.
 
-> **English:** Pullmark is a web app that makes focus ring labels from Tilta lens files (`.tl`), or from a lens you measure yourself, for the Tilta ARRI ring and the original Tilta ring on the Nucleus-M II and the ARRI WCU-4. Open the link above; it starts in English unless your browser is set to Dutch. Switch language with the globe at the top right.
+> **English:** Pullmark is a web app that makes focus ring labels from Tilta lens files (`.tl`), or from a lens you measure yourself, ready to go for the Tilta ARRI ring and the original Tilta ring on the Nucleus-M II; any other ring (the ARRI WCU-4, for example) you measure yourself with the calibration label. Open the link above; it starts in English unless your browser is set to Dutch. Switch language with the globe at the top right.
 
 ## Installeren op de Mac (Chrome)
 
@@ -18,9 +18,13 @@ Je lenzen en instellingen blijven op je eigen Mac. Ze staan niet in deze reposit
 
 ## Hoe ∞ wordt bepaald (Tilta ARRI-ring)
 
-Een `.tl`-bestand zegt per afstand welke motorwaarde (0–10.000) erbij hoort, maar niet waar die op de ring ligt. Het profiel Tilta ARRI-ring heeft daarvoor één vaste meting: ∞ van de Dulens 21 mm (motorwaarde 9707) ligt 7,2 mm onder het midden van de nudge, bij 24,5 mm per 1000. Elke andere lens, van elk merk, volgt daaruit met zijn eigen `.tl`-waarden. Opnieuw meten kan per lens onder **Schaal nameten**. Het profiel ARRI WCU-4-ring is apart en werkt zoals voorheen.
+Een `.tl`-bestand zegt per afstand welke motorwaarde (0–10.000) erbij hoort, maar niet waar die op de ring ligt. Het profiel Tilta ARRI-ring heeft daarvoor één vaste meting: ∞ van de Dulens 21 mm (motorwaarde 9707) ligt 7,2 mm onder het midden van de nudge, bij 24,5 mm per 1000. Elke andere lens, van elk merk, volgt daaruit met zijn eigen `.tl`-waarden. Opnieuw meten kan per lens onder **Schaal nameten**.
 
 **Originele Tilta-ring** (de kleinere ring die bij de Nucleus-M II zit): label 11 × 225 mm, dat begint tegen de onderkant van de nudge. Gemeten op de Dulens 21 mm: ∞ op 80,4 mm, schaal 21,88 mm per 1000 (24,5 × 225/252: hetzelfde wiel, een kleinere ring). De schaal loopt rond de nudge door, dus de korte afstanden staan bovenaan, en het brandpunt staat in het gat tussen de kortste afstand en ∞.
+
+## Eigen ring
+
+Voor elke andere ring of handunit, bijvoorbeeld de ARRI WCU-4: kies het profiel **Eigen ring (zelf inmeten)**. Meet de hoogte van de ring en de lengte van de nudge rondom tot de andere kant van de nudge, en vul die in bij Label. Print daarna het meetlabel (0 tegen de nudge) en meet ∞ en de schaal in met **Schaal nameten**, of meet je lenzen helemaal in. De app levert alleen maten mee die zelf aan een ring zijn gemeten.
 
 ## Lens inmeten (zonder lensbestand)
 

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Pullmark</title>
-<meta name="description" content="Pullmark: focusringlabels voor de Tilta Nucleus-M II en ARRI WCU-4, uit Tilta-lensbestanden of zelf ingemeten.">
+<meta name="description" content="Pullmark: focusringlabels voor de Tilta Nucleus-M II en elke ring die je zelf inmeet, uit Tilta-lensbestanden of zelf ingemeten lenzen.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
@@ -429,7 +429,7 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
 <path d="M45 1.5 L55 1.5 L50 8.5 Z" fill="var(--ink)"/></g></svg>
     <div>
       <h1>Pullmark</h1>
-      <div class="sub" id="subTitle">WCU-4 · Tilta-ring</div>
+      <div class="sub" id="subTitle"></div>
     </div>
   </div>
   <div class="actions">
@@ -563,10 +563,21 @@ body.dragging .start { outline: 2px dashed var(--accent); outline-offset: 6px; }
             <button class="btn small" id="btnProfCopy" type="button">Kopie maken</button>
             <button class="btn small danger" id="btnProfDel" type="button">Verwijderen</button>
           </div>
-          <div class="field"><span>Nieuw profiel met de originele maten</span><div class="row" id="profTemplates"></div></div>
+          <div class="field"><span>Nieuw profiel</span><div class="row" id="profTemplates"></div></div>
           <p class="hint">Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.</p>
+          <p class="hint">Eigen ring: voor elke andere ring of handunit. Die meet je zelf in met het meetlabel.</p>
         </div>
       </details>
+      <section class="stack" id="customBox" hidden>
+        <h2>Eigen ring inmeten</h2>
+        <ol class="steps small">
+          <li>Meet de hoogte van de ring en vul die in bij Label › Breedte.</li>
+          <li>Meet met een strook papier de lengte van de nudge rondom tot de andere kant van de nudge. Vul die in bij Label › Lengte.</li>
+          <li>Print het meetlabel en plak het om de ring, met 0 tegen de nudge (kant van ∞).</li>
+          <li>Met lensbestanden: kies een lens en open Schaal nameten. Zonder lensbestand: meet de lens in met Lens inmeten.</li>
+        </ol>
+        <div class="row"><button class="btn small" id="btnCalib2" type="button">Meetlabel downloaden</button></div>
+      </section>
 
       <h2 class="grouphead">Ring</h2>
       <section class="stack">
@@ -697,21 +708,18 @@ var Engine = (function () {
   var LANG = 'nl';
   function setLang(l) { LANG = l === 'en' ? 'en' : 'nl'; }
   function say(nl, en) { return LANG === 'en' ? en : nl; }
-  var RING_EN = { 'arri-wcu4': 'ARRI WCU-4 ring', 'tilta-nucleus': 'Tilta ARRI ring on Nucleus-M II (via ARRI adapter)', 'tilta-orig': 'Tilta ring Nucleus-M II (original)' };
+  var RING_EN = { 'tilta-nucleus': 'Tilta ARRI ring on Nucleus-M II (via ARRI adapter)', 'tilta-orig': 'Tilta ring Nucleus-M II (original)',
+    'custom': 'Own ring (measure it yourself)', 'arri-wcu4': 'ARRI WCU-4 ring (own measurements)' };
 
-  // ARRI-ring op de ARRI WCU-4 (standaardmaat, gemeten aan een bestaand labelvel op 300 dpi).
   var RINGS = {
-    'arri-wcu4': {
-      label: 'ARRI WCU-4-ring',
-      W: 19.39,          // breedte strook
-      top: -9.48,        // bovenkant t.o.v. nudge-midden
-      length: 253.02,    // totale lengte strook
-      corner: 0.9,       // hoekradius
-      notch: { h: 1.75, depth: 5.33, fillet: 2.5 }, // nudge-uitsparing (h = halve breedte)
-      mmPer1000: 24.31,  // mm per 1000 encoder-eenheden (fv)
-      offset: 5.0,       // nudge-midden -> midden ∞-lijn
-      radius: 9320,      // kromming linkerrand (0 = recht)
-      endZone: 10        // geen streepjes in de laatste x mm
+    // Eigen ring: de app levert hier geen vaste maten. Het label begint tegen de nudge (kant van ∞) en loopt rond
+    // tot de andere kant van de nudge. Hoogte, lengte, schaal en ∞ meet je zelf in met het meetlabel,
+    // of je meet je lenzen helemaal in met Lens inmeten. De getallen hieronder zijn alleen een begin.
+    'custom': {
+      label: 'Eigen ring (zelf inmeten)',
+      W: 19, top: 0, length: 240, corner: 0.9,
+      notch: { h: 0, depth: 0, fillet: 0 },
+      mmPer1000: 24.5, offset: 30, radius: 0, endZone: 0, zeroRef: 'bottom', infMode: 'lens', circ: true, textInGap: true
     },
     // Tilta ARRI-ring: ARRI-maat ring op de Tilta ARRI-adapter van de Nucleus-M II (niet de originele Nucleus-ring).
     // Volgens Stefan: 252 mm sluit het mooist, recht; nudge 4 mm diep en 3,3 mm breed, ingang zonder afronding;
@@ -738,6 +746,14 @@ var Engine = (function () {
       anchorFv: 9707, anchorLabel: 'Dulens 21 mm', lockInf: true, circ: 225, textInGap: true
     }
   };
+  // Oude profielen voor de ARRI WCU-4. De app levert daar geen maten meer voor (zelf inmeten met het meetlabel);
+  // dit is alleen nog een huls zodat opgeslagen profielen blijven werken: hun eigen maten staan in het profiel zelf.
+  // De vorm volgt de Tilta ARRI-ring (zelfde ARRI-maat ring), zonder vaste ∞-meting.
+  RINGS['arri-wcu4'] = (function (t) {
+    return { label: 'ARRI WCU-4-ring (eigen maten)', W: t.W, top: t.top, length: t.length, corner: t.corner,
+      notch: { h: t.notch.h, depth: t.notch.depth, fillet: t.notch.fillet },
+      mmPer1000: t.mmPer1000, offset: t.offset, radius: 0, endZone: t.endZone, legacy: true };
+  })(RINGS['tilta-nucleus']);
 
   var L = {
     rCap: 3.65, rSup: 2.3, lCap: 3.7, lSup: 2.3,
@@ -1256,6 +1272,8 @@ var Engine = (function () {
     var C = ring.circ || 0;
     // rondlopende schaal: voorbij het eind van het label verder bovenaan (tot vlak voor ∞)
     var wrapMax = inf ? vOf(inf.fv) - L.lineMajor / 2 - L.infGap - L.infH - 1.0 : ring.bottom;
+    // brandpunt in het gat boven ∞: houd daar ruimte voor vrij, anders botsen de rondgelopen cijfers met de tekst
+    if (ring.textInGap && inf) wrapMax = Math.min(wrapMax, vOf(inf.fv) - L.lineMajor / 2 - L.infGap - L.infH - 0.8 - L.focalCap - 1.0 - L.lCap / 2);
     pts.forEach(function (p) {
       p.raw = vOf(p.fv); p.v = p.raw; p.wrap = false;
       if (C && p.d !== Infinity && p.raw > ring.bottom - 0.5) { p.v = p.raw - C; p.wrap = true; }
@@ -1954,7 +1972,6 @@ var I18N = (function () {
   // ---------- woordenboek: hele zinnen en labels ----------
   var EXACT = {
     // kop en tabbladen
-    'WCU-4 · Tilta-ring': 'WCU-4 · Tilta ring',
     'Installeren als app': 'Install as app',
     'Printen': 'Print',
     'PDF downloaden': 'Download PDF',
@@ -2014,7 +2031,7 @@ var I18N = (function () {
     'Sleep je .tl-bestanden hierheen, of kies ze hieronder. Elke lens wordt één strook; lenzen van hetzelfde merk komen samen in een map.': 'Drag your .tl files here, or choose them below. Each lens becomes one strip; lenses of the same brand go into one folder.',
     'Ring kiezen': 'Choose the ring',
     'de .tl-bestanden van je lenzen.': 'the .tl files of your lenses.',
-    'bij Ring staat de Tilta ARRI-ring al klaar. Gebruik je de ARRI WCU-4, kies dan dat profiel.': 'the Tilta ARRI ring is already set up under Ring. Using the ARRI WCU-4? Choose that profile.',
+    'bij Ring staan de Tilta-ringen al klaar. Een andere ring? Kies Eigen ring en meet hem in met het meetlabel.': 'the Tilta rings are already set up under Ring. Another ring? Choose Own ring and measure it with the calibration label.',
     'op 100%, daarna snijden langs de lijn.': 'at 100%, then cut along the line.',
     'Nog geen .tl-bestanden bij de hand?': 'No .tl files at hand?',
     'Voorbeeld bekijken': 'View an example',
@@ -2152,10 +2169,18 @@ var I18N = (function () {
     'Naam': 'Name',
     'Kopie maken': 'Make a copy',
     'Verwijderen': 'Delete',
-    'Nieuw profiel met de originele maten': 'New profile with the original dimensions',
+    'Nieuw profiel': 'New profile',
     'Tilta ARRI-ring: een ring op ARRI-maat op de Tilta ARRI-adapter van de Nucleus-M II, niet de Tilta-ring die erbij zit.': 'Tilta ARRI ring: an ARRI-size ring on the Tilta ARRI adapter of the Nucleus-M II, not the Tilta ring that comes with it.',
     'Tilta ARRI-ring op Nucleus-M II': 'Tilta ARRI ring on Nucleus-M II',
     'ARRI WCU-4-ring': 'ARRI WCU-4 ring',
+    'ARRI WCU-4-ring (eigen maten)': 'ARRI WCU-4 ring (own measurements)',
+    'Eigen ring (zelf inmeten)': 'Own ring (measure it yourself)',
+    'Eigen ring: voor elke andere ring of handunit. Die meet je zelf in met het meetlabel.': 'Own ring: for any other ring or hand unit. You measure it yourself with the calibration label.',
+    'Eigen ring inmeten': 'Measure your own ring',
+    'Meet de hoogte van de ring en vul die in bij Label › Breedte.': 'Measure the height of the ring and enter it under Label › Width.',
+    'Meet met een strook papier de lengte van de nudge rondom tot de andere kant van de nudge. Vul die in bij Label › Lengte.': 'With a strip of paper, measure the length from the nudge all the way round to the other side of the nudge. Enter it under Label › Length.',
+    'Print het meetlabel en plak het om de ring, met 0 tegen de nudge (kant van ∞).': 'Print the calibration label and stick it around the ring, with 0 against the nudge (side of ∞).',
+    'Met lensbestanden: kies een lens en open Schaal nameten. Zonder lensbestand: meet de lens in met Lens inmeten.': 'With lens files: choose a lens and open Re-measure the scale. Without a lens file: measure the lens with Measure a lens.',
     'Tilta-ring Nucleus-M II (origineel)': 'Tilta ring Nucleus-M II (original)',
     '0 = geen uitsparing': '0 = no cutout',
     'Mijn ring': 'My ring',
@@ -2587,7 +2612,8 @@ function newFolder(name, key, presetKey) {
 var JIG_FILE = 'Pullmark_mal_Tilta-ARRI-ring.stl';
 var JIG_URL = (window.__PWA__ ? '' : 'https://stefanspoelstra.github.io/focusringlabels/') + 'mal/' + JIG_FILE;
 function isTiltaRing(prof) { return !!(prof && prof.ring && Engine.presetKey(prof.ring.preset) === 'tilta-nucleus'); }
-var TEMPLATE_NAMES = { 'tilta-nucleus': T('Tilta ARRI-ring op Nucleus-M II'), 'tilta-orig': T('Tilta-ring Nucleus-M II (origineel)'), 'arri-wcu4': T('ARRI WCU-4-ring') };
+// de app levert alleen maten die Stefan zelf heeft gemeten; elke andere ring meet je zelf in (Eigen ring)
+var TEMPLATE_NAMES = { 'tilta-nucleus': T('Tilta ARRI-ring op Nucleus-M II'), 'tilta-orig': T('Tilta-ring Nucleus-M II (origineel)'), 'custom': T('Eigen ring (zelf inmeten)') };
 // v17: oude profielnamen en sleutels van de ARRI-ring opschonen
 function migr17(j) {
   if (j.migr >= 17) return;
@@ -2610,6 +2636,14 @@ function migr39(j) {
   if (!(j.profiles || []).some(function (x) { return x.ring && Engine.presetKey(x.ring.preset) === 'tilta-orig'; }))
     (j.profiles = j.profiles || []).push({ id: uid('p'), name: TEMPLATE_NAMES['tilta-orig'], ring: Engine.snapshotRing({ preset: 'tilta-orig' }) });
   j.migr = 39;
+}
+// v42: geen vaste maten meer voor de ARRI WCU-4-ring. Opgeslagen WCU-4-profielen blijven staan met hun eigen maten;
+// nieuw is het profiel Eigen ring, dat je zelf inmeet.
+function migr42(j) {
+  if (j.migr >= 42) return;
+  if (!(j.profiles || []).some(function (x) { return x.ring && Engine.presetKey(x.ring.preset) === 'custom'; }))
+    (j.profiles = j.profiles || []).push({ id: uid('p'), name: TEMPLATE_NAMES['custom'], ring: Engine.snapshotRing({ preset: 'custom' }) });
+  j.migr = 42;
 }
 // v33: geen voorbeeldlens meer. Een bibliotheek met alléén de oude voorbeeldlens (Dulens 85 mm) gaat terug naar
 // het startscherm; de map blijft, met opmaak en profiel, maar heet weer 'Lenzen'. Staan er meer lenzen in, dan blijft
@@ -2654,15 +2688,11 @@ function migr28(j) {
   });
   j.migr = 28;
 }
-// v16: Tilta-profielen heten nu 'Tilta ARRI-ring' en krijgen de gemeten nudge (4 × 3,3 mm) als die nog op de oude maat stond
+// v16: Tilta-profielen heten nu 'Tilta ARRI-ring'
 function migr16(j) {
   if (j.migr >= 16) return;
   (j.profiles || []).forEach(function (x) {
     x.name = String(x.name || '').replace(/^Tilta-ring op Nucleus-M II/, 'Tilta ARRI-ring op Nucleus-M II');
-    var r = x.ring || {};
-    if (Engine.presetKey(r.preset) === 'tilta-nucleus' && Math.abs(Number(r.notchDepth) - 5.33) < 0.01 && Math.abs(Number(r.notchWidth) - 3.5) < 0.01) {
-      r.notchDepth = 4.0; r.notchWidth = 3.3;
-    }
   });
   j.migr = 16;
 }
@@ -2702,7 +2732,7 @@ function renderDefaults() {
 }
 function defaults() {
   // 'focusringlabels' blijft de interne naam van het bibliotheekformaat, zodat oude bibliotheken gewoon openen
-  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 39, profiles: [], saved: [] };
+  P = { app: 'focusringlabels', version: 3, minors: true, lensText: true, pngDpi: 600, folders: [], lenses: [], active: null, defaults: {}, migr: 42, profiles: [], saved: [] };
   Object.keys(TEMPLATE_NAMES).forEach(function (k) { P.profiles.push(makeProfile(TEMPLATE_NAMES[k], { preset: k })); });
   // geen voorbeeldlens meer: één lege startmap, die het eerste merk overneemt (met opmaak en profiel die je al koos)
   var f = newFolder(T('Lenzen')); f.starter = true; P.folders.push(f);
@@ -2736,7 +2766,7 @@ function migrate(j) {
     j.defaults = j.defaults && typeof j.defaults === 'object' ? j.defaults : {};
     if (j.defaults.style) j.defaults.style = Engine.normalizeStyle(j.defaults.style);
     if (j.defaults.ring && !(j.defaults.ring.ring)) delete j.defaults.ring;
-    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); migr33(j); migr39(j); P = save3;
+    var save3 = P; P = j; toV3(j); migr16(j); migr17(j); migr28(j); migr31(j); migr33(j); migr39(j); migr42(j); P = save3;
     j.saved = (Array.isArray(j.saved) ? j.saved : []).filter(function (x) { return x && x.style; })
       .map(function (x) { return { id: x.id || uid('s'), name: String(x.name || 'Opmaak').slice(0, 40), style: Engine.normalizeStyle(x.style) }; });
     return j;
@@ -2755,7 +2785,7 @@ function migrate(j) {
   });
   if (!P.folders.length) { var nf = newFolder(old.name || 'Lenzen'); nf.style = clone(style); P.folders.push(nf); }
   P.active = P.folders[0].id;
-  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P); migr33(P); migr39(P);
+  toV3(P); migr16(P); migr17(P); migr28(P); migr31(P); migr33(P); migr39(P); migr42(P);
   var out = P; P = save2;
   return out;
 }
@@ -3374,7 +3404,7 @@ function buildRingSliders() {
   main.forEach(function (x) { $('ringSliders').appendChild(x); });
   // label: maten, uitsparing voor de nudge en afgeronde hoeken
   var size = [
-    s('length', 'Lengte', 'korter = minder overlap', 200, 270, 0.1),
+    s('length', 'Lengte', 'korter = minder overlap', 150, 320, 0.1),
     s('width', 'Breedte', 'hoogte van de ring', 8, 26, 0.05),
     sliderField({ id: 'radius', label: 'Kromming', hint: 'straal, 0 = recht', min: 0, max: 20000, step: 10, unit: 'mm', get: function () { return ringVal('radius'); }, set: function (v) { curRs().radius = v; } }),
     sliderField({ id: 'endZone', label: 'Lege zone onderaan', hint: '', min: 0, max: 40, step: 0.5, unit: 'mm', get: function () { return ringVal('endZone'); }, set: function (v) { curRs().endZone = v; } })
@@ -3534,7 +3564,7 @@ function startCard() {
   c.appendChild(row);
   var ol = el('ol', 'steps');
   [['Lenzen laden', 'de .tl-bestanden van je lenzen.'],
-   ['Ring kiezen', 'bij Ring staat de Tilta ARRI-ring al klaar. Gebruik je de ARRI WCU-4, kies dan dat profiel.'],
+   ['Ring kiezen', 'bij Ring staan de Tilta-ringen al klaar. Een andere ring? Kies Eigen ring en meet hem in met het meetlabel.'],
    ['Printen', 'op 100%, daarna snijden langs de lijn.']].forEach(function (s) {
     var li = el('li'), d = el('div'); d.appendChild(el('b', '', s[0])); d.appendChild(document.createTextNode(' ')); d.appendChild(el('span', '', s[1])); li.appendChild(d); ol.appendChild(li);
   });
@@ -4260,6 +4290,8 @@ function renderRingPane() {
   $('profUsed').textContent = 'Gebruikt door: ' + (users.length ? users.join(', ') : 'geen map');
   $('btnProfDel').disabled = P.profiles.length <= 1;
   $('jigBox').hidden = !isTiltaRing(prof);
+  var pk = Engine.presetKey(prof.ring && prof.ring.preset);
+  $('customBox').hidden = !(pk === 'custom' || pk === 'arri-wcu4');
   var tb = $('profTemplates');
   if (!tb._built) {
     tb._built = true;
@@ -4348,6 +4380,7 @@ function exportPDF(all, btn) {
   }).catch(function (e) { toast('PDF maken mislukt: ' + (e && e.message || e), { err: true }); })
     .then(function () { busy(btn, false); });
 }
+$('btnCalib2').onclick = function () { $('btnCalib').click(); };
 $('btnCalib').onclick = function () {
   var btn = $('btnCalib'); busy(btn, true);
   var rs = ringRs(currentProfile()), pages = Engine.buildCalibPages(rs, { date: today() }), r = Engine.ringFor(rs);
@@ -4650,7 +4683,7 @@ if (window.__PWA__ && 'serviceWorker' in navigator && !inViewer && /^https?:$/.t
   }).catch(function () {});
 }
 
-var APP_VERSION = '41 · ' + (LANG === 'en' ? '2026-10-14 · new name: Pullmark' : '14-10-2026 · nieuwe naam: Pullmark');
+var APP_VERSION = '42 · ' + (LANG === 'en' ? '2026-10-14 · own ring, measure it yourself' : '14-10-2026 · eigen ring, zelf inmeten');
 $('appVer').textContent = 'Versie ' + APP_VERSION;
 measureBar();
 P = load();
