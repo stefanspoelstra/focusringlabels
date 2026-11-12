@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.0 · 12-11-2026';
+  var VERSION = '2.1 · 12-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -51,7 +51,30 @@
   var ALL = {}; Object.keys(Engine.STYLES).forEach(function (k) { ALL[k] = Engine.STYLES[k]; }); Object.keys(EXTRA).forEach(function (k) { ALL[k] = EXTRA[k]; });
   var GROUPS = [['Effen', 'Solid'], ['Donker', 'Dark'], ['Verloop', 'Gradient'], ['Heel label', 'Full label'], ['Speciaal', 'Special'], ['Creatief', 'Creative'], ['Op de set', 'On set']];
   function customStyle(c) { return { label: 'Eigen', ink: c.ink, bandL: 1.61, split: 11.27, bandR: 0, zones: { bandL: sol(c.band), left: sol(c.left), right: sol(c.right), bandR: sol(c.band) } }; }
-  function styleOf(set) { return set.custom ? customStyle(set.custom) : (ALL[set.styleKey] || ALL[STYLE_KEYS[0]]); }
+  // set.edit = een stijl die je zelf hebt aangepast (kleurvlakken, verloop, strepen); anders de gekozen stijl uit de lijst
+  function styleOf(set) { return set.edit || (set.custom ? customStyle(set.custom) : (ALL[set.styleKey] || ALL[STYLE_KEYS[0]])); }
+  function editStyle(set) {
+    if (!set.edit) {
+      var n = Engine.normalizeStyle(styleOf(set));
+      set.edit = { label: 'Eigen', ink: n.ink, bandL: n.bandL, split: n.split, bandR: n.bandR, fullFill: n.fullFill,
+        zones: JSON.parse(JSON.stringify(n.zones)), stripes: JSON.parse(JSON.stringify(n.stripes)) };
+      delete set.custom;
+    }
+    return set.edit;
+  }
+  function mixHex(a, b) {
+    var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), o = '#';
+    [16, 8, 0].forEach(function (sh) { var v = Math.round((((x >> sh) & 255) + ((y >> sh) & 255)) / 2).toString(16); o += v.length < 2 ? '0' + v : v; });
+    return o;
+  }
+  // een kleurvlak lezen en schrijven als: soort (effen of verloop) met twee kleuren
+  function zoneGet(z) { return { mode: z.mode, a: z.c[0], b: z.mode === 'y' ? z.c[2] : z.mode === 'x' ? z.c[1] : z.c[3] }; }
+  function zoneSet(mode, a, b) {
+    if (mode === 'y') return { mode: 'y', c: [a, a, b, b] };
+    if (mode === 'x') return { mode: 'x', c: [a, b, a, b] };
+    if (mode === 'xy') { var m = mixHex(a, b); return { mode: 'xy', c: [a, m, m, b] }; }
+    return { mode: 'solid', c: [a, a, a, a] };
+  }
   function zoneCss(z) {
     if (!z) return '#ffffff';
     if (z.mode === 'y') return 'linear-gradient(180deg,' + (z.stops ? z.stops.map(function (q) { return q[1] + ' ' + Math.round(q[0] * 100) + '%'; }).join(',') : z.c[0] + ',' + z.c[2]) + ')';
@@ -82,6 +105,10 @@
     return fresh();
   }
   var S = load(), msgs = [];
+  // welke kopjes open staan
+  var UI = { open: { kleur: true } };
+  try { var u0 = JSON.parse(localStorage.getItem('pm2ui')); if (u0 && u0.open) UI = u0; } catch (e) {}
+  function saveUI() { try { localStorage.setItem('pm2ui', JSON.stringify(UI)); } catch (e) {} }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
   function activeSet() { return S.sets.filter(function (s) { return s.id === S.active; })[0] || S.sets[0] || null; }
   function uid() { return 'x' + Math.random().toString(36).slice(2, 9); }
@@ -144,15 +171,24 @@
   // hoeken: 0 = recht (te snijden met mes en liniaal), anders de straal in mm
   function numOr(v, d) { return v === undefined || v === null || v === '' || !isFinite(Number(v)) ? d : Number(v); }
   var CAP_ROUND = { round: 100, soft: 25, square: 0 };
-  var EDGES = { line: { on: true, pos: 'center', width: 0.15, color: '#8a8a8a' }, thin: { on: true, pos: 'in', width: 0.35, color: '#111111' } };
-  function jobFor(set) {
+  // vorm van het label: hoeken boven en onder apart, en de uitsparing voor de nudge rond of recht
+  function shape() {
     var o = S.opts, c = numOr(o.corner, 0.9);
-    // rechte hoeken: dan is ook de uitsparing voor de nudge recht
-    // rand om label, lensdop en lenslijst: een dunne grijze snijlijn, of een zwarte rand die op het label blijft staan
-    var style = styleOf(set), ol = EDGES[o.edge];
+    return { top: numOr(o.cornerTop, c), bottom: numOr(o.cornerBottom, c), square: o.notch ? o.notch === 'square' : c === 0 };
+  }
+  function edge() {
+    var o = S.opts;
+    if (o.edge === 'line') return { on: true, pos: 'center', width: 0.15, color: '#8a8a8a' };
+    if (o.edge === 'thin') return { on: true, pos: ['in', 'center', 'out'].indexOf(o.edgePos) > -1 ? o.edgePos : 'in', width: numOr(o.edgeW, 0.35), color: /^#[0-9a-f]{6}$/i.test(o.edgeColor || '') ? o.edgeColor : '#111111' };
+    return null;
+  }
+  function jobFor(set) {
+    var o = S.opts, f = shape();
+    // rand om label, lensdop en lenslijst: een dunne grijze snijlijn, of een rand die op het label blijft staan
+    var style = styleOf(set), ol = edge();
     if (ol) { style = Object.assign({}, style); style.outline = ol; }
-    return { ring: { preset: S.ring, cornerTop: c, cornerBottom: c, notchSquare: c === 0 }, style: style, name: set.name, lenses: set.lenses,
-      minors: o.minors !== false, lensText: o.lensText !== false, topExtra: o.topExtra !== false,
+    return { ring: { preset: S.ring, cornerTop: f.top, cornerBottom: f.bottom, notchSquare: f.square }, style: style, name: set.name, lenses: set.lenses,
+      minors: o.minors !== false, lensText: o.lensText !== false, topExtra: o.topExtra !== false, lineScale: numOr(o.lineScale, 1),
       caps: !!o.caps.on, capD: o.caps.d, capCount: o.caps.n, capRound: CAP_ROUND[o.caps.shape] === undefined ? 100 : CAP_ROUND[o.caps.shape], capGap: 4, capBg: o.caps.bg || 'set', capColor: solidOf(set),
       lensList: { on: !!o.list.on, size: o.list.size, n: o.list.n, bg: o.list.bg, color: solidOf(set), corner: numOr(o.list.corner, 2.5) } };
   }
@@ -207,6 +243,26 @@
     var i = el('input'); i.type = 'number'; i.min = min; i.max = max; i.step = 1; i.value = get();
     i.onchange = function () { var v = Math.max(min, Math.min(max, Number(i.value) || get())); i.value = v; set(v); changed(); };
     return i;
+  }
+  // schuif met de waarde erachter; tijdens het slepen wordt alleen het vel opnieuw getekend
+  function slider(label, get, set, min, max, step, fmtv) {
+    var r = el('label', 'slide'), i = el('input'), out = el('output');
+    i.type = 'range'; i.min = min; i.max = max; i.step = step; i.value = get();
+    var show = function () { out.textContent = fmtv ? fmtv(Number(i.value)) : mm(Number(i.value)); }; show();
+    i.oninput = function () { set(Number(i.value)); show(); changed(); };
+    r.appendChild(el('span', '', label)); r.appendChild(i); r.appendChild(out); return r;
+  }
+  function mm(v) { var t = (Math.round(v * 100) / 100).toFixed(v % 1 && Math.round(v * 10) !== v * 10 ? 2 : 1); return (LANG === 'en' ? t : t.replace('.', ',')) + ' mm'; }
+  function colorIn(get, set, label) {
+    var c = el('input'); c.type = 'color'; c.value = /^#[0-9a-f]{6}$/i.test(get() || '') ? get() : '#888888'; if (label) c.setAttribute('aria-label', label);
+    c.oninput = function () { set(c.value); changed(); }; return c;
+  }
+  // inklapbaar kopje; onthoudt of het open staat
+  function group(parent, id, title, val) {
+    var d = el('details', 'grp'), sm = el('summary'); d.open = !!UI.open[id];
+    sm.appendChild(el('span', '', title)); if (val) sm.appendChild(el('small', '', val));
+    d.appendChild(sm); d.addEventListener('toggle', function () { if (UI.open[id] !== d.open) { UI.open[id] = d.open; saveUI(); } });
+    var b = el('div', 'gbody'); d.appendChild(b); parent.appendChild(d); return b;
   }
   function selIn(opts, get, set) {
     var s = el('select'); opts.forEach(function (o) { var op = el('option', '', o[1]); op.value = o[0]; s.appendChild(op); });
@@ -286,58 +342,84 @@
     s2.appendChild(ml);
     P.appendChild(s2);
 
-    // ---- 3. printen ----
-    var s3 = el('section', 'step'); s3.appendChild(stepHead(3, T('Printen', 'Print')));
+    // ---- 3. opmaak ----
+    var o = S.opts, s3 = el('section', 'step'); s3.appendChild(stepHead(3, T('Opmaak', 'Design')));
+    var g;
     if (set) {
-      s3.appendChild(el('h3', '', T('Kleur van deze set', 'Color of this set')));
+      var cur = Engine.normalizeStyle(styleOf(set)), own = !!(set.edit || set.custom);
+      // kleur
+      g = group(s3, 'kleur', T('Kleur', 'Color'), own ? T('eigen', 'custom') : (cur.label || ''));
       var box = el('div', 'swbox');
-      GROUPS.forEach(function (g) {
-        var keys = Object.keys(ALL).filter(function (k) { return ALL[k].group === g[0]; }); if (!keys.length) return;
-        box.appendChild(el('h4', '', T(g[0], g[1])));
+      GROUPS.forEach(function (gr) {
+        var keys = Object.keys(ALL).filter(function (k) { return ALL[k].group === gr[0]; }); if (!keys.length) return;
+        box.appendChild(el('h4', '', T(gr[0], gr[1])));
         var sw = el('div', 'swatches');
         keys.forEach(function (k) {
-          sw.appendChild(swatch(ALL[k], !set.custom && set.styleKey === k, ALL[k].label || k, function () { delete set.custom; set.styleKey = k; changed(); renderPanel(); }));
+          sw.appendChild(swatch(ALL[k], !own && set.styleKey === k, ALL[k].label || k, function () { delete set.custom; delete set.edit; set.styleKey = k; changed(); renderPanel(); }));
         });
         box.appendChild(sw);
       });
-      s3.appendChild(box);
-      // eigen kleuren: rand, links, rechts en inkt
-      var cur = Engine.normalizeStyle(styleOf(set)), cu = el('div', 'custom');
-      cu.appendChild(el('span', 'cl', T('Eigen kleuren', 'Your own colors')));
-      [['band', T('rand', 'edge'), cur.zones.bandL.c[0]], ['left', T('links', 'left'), cur.zones.left.c[0]], ['right', T('rechts', 'right'), cur.fullFill ? cur.zones.left.c[0] : cur.zones.right.c[0]], ['ink', T('inkt', 'ink'), cur.ink]].forEach(function (q) {
-        var lab = el('label'), ci = el('input'); ci.type = 'color'; ci.value = /^#[0-9a-f]{6}$/i.test(q[2]) ? q[2] : '#888888'; ci.setAttribute('data-k', q[0]);
-        ci.oninput = function () {
-          var c = {}; Array.prototype.forEach.call(cu.querySelectorAll('input[type=color]'), function (x) { c[x.getAttribute('data-k')] = x.value; });
-          set.custom = c; changed();
-        };
-        ci.onchange = function () { renderPanel(); };
-        lab.appendChild(ci); lab.appendChild(document.createTextNode(q[1])); cu.appendChild(lab);
+      g.appendChild(box);
+      var ik = el('div', 'sub flat'); ik.appendChild(document.createTextNode(T('Inkt voor cijfers en streepjes', 'Ink for numbers and ticks')));
+      ik.appendChild(colorIn(function () { return cur.ink; }, function (v) { editStyle(set).ink = v; }, T('Inktkleur', 'Ink color')));
+      g.appendChild(ik);
+      if (own) g.appendChild(el('p', 'hint', T('Je hebt deze stijl zelf aangepast. Klik op een kleur hierboven om opnieuw te beginnen.', 'You changed this style yourself. Click a color above to start over.')));
+
+      // kleurvlakken en verloop
+      g = group(s3, 'vlakken', T('Kleurvlakken en verloop', 'Color areas and gradient'));
+      g.appendChild(check(T('Eén vlak over het hele label', 'One area across the whole label'), function () { return cur.fullFill; }, function (v) { editStyle(set).fullFill = v; }));
+      var MODES = [['solid', T('effen', 'solid')], ['y', T('verloop boven → onder', 'gradient top → bottom')], ['x', T('verloop links → rechts', 'gradient left → right')], ['xy', T('verloop schuin', 'diagonal gradient')]];
+      [['bandL', T('Rand links', 'Left edge')], ['left', cur.fullFill ? T('Vlak', 'Area') : T('Links', 'Left')], ['right', T('Rechts', 'Right')], ['bandR', T('Rand rechts', 'Right edge')]].forEach(function (zq) {
+        if (zq[0] === 'right' && cur.fullFill) return;
+        var z = zoneGet(cur.zones[zq[0]]), row = el('div', 'zone');
+        var put = function (mode, a, b2) { editStyle(set).zones[zq[0]] = zoneSet(mode, a, b2); };
+        row.appendChild(el('span', '', zq[1]));
+        row.appendChild(selIn(MODES, function () { return z.mode; }, function (v) { put(v, z.a, z.mode === 'solid' ? z.a : z.b); }));
+        row.appendChild(colorIn(function () { return z.a; }, function (v) { z.a = v; put(z.mode, z.a, z.mode === 'solid' ? z.a : z.b); }, zq[1]));
+        if (z.mode !== 'solid') {
+          row.appendChild(colorIn(function () { return z.b; }, function (v) { z.b = v; put(z.mode, z.a, z.b); }, zq[1] + ' 2'));
+          var flip = el('button', 'linkbtn', T('omkeren', 'flip')); flip.type = 'button';
+          flip.onclick = function () { put(z.mode, z.b, z.a); changed(); renderPanel(); };
+          row.appendChild(flip);
+        }
+        g.appendChild(row);
       });
-      s3.appendChild(cu);
+      g.appendChild(slider(T('Breedte rand links', 'Left edge width'), function () { return cur.bandL; }, function (v) { editStyle(set).bandL = v; }, 0, 6, 0.1));
+      if (!cur.fullFill) g.appendChild(slider(T('Grens links / rechts', 'Left / right boundary'), function () { return cur.split; }, function (v) { editStyle(set).split = v; }, 3, 17, 0.1));
+      g.appendChild(slider(T('Breedte rand rechts', 'Right edge width'), function () { return cur.bandR; }, function (v) { editStyle(set).bandR = v; }, 0, 6, 0.1));
+
+      // sierstrepen
+      g = group(s3, 'strepen', T('Sierstrepen', 'Stripes'), cur.stripes.length ? String(cur.stripes.length) : '');
+      g.appendChild(el('p', 'hint', T('Smalle strepen over de hele lengte, gemeten vanaf de linkerrand.', 'Narrow stripes along the full length, measured from the left edge.')));
+      cur.stripes.forEach(function (sp, si) {
+        var row = el('div', 'zone'), st = function () { return editStyle(set).stripes[si]; };
+        var p1 = el('input'); p1.type = 'number'; p1.min = 0; p1.max = 19; p1.step = 0.1; p1.value = Math.round(sp.u0 * 100) / 100; p1.setAttribute('aria-label', T('Vanaf links (mm)', 'From the left (mm)'));
+        var p2 = el('input'); p2.type = 'number'; p2.min = 0.1; p2.max = 6; p2.step = 0.1; p2.value = Math.round((sp.u1 - sp.u0) * 100) / 100; p2.setAttribute('aria-label', T('Breedte (mm)', 'Width (mm)'));
+        var upd = function () { var a = Math.max(0, Number(p1.value) || 0), w = Math.max(0.1, Number(p2.value) || 0.3), q = st(); q.u0 = a; q.u1 = a + w; changed(); };
+        p1.oninput = upd; p2.oninput = upd;
+        var x = el('button', 'x', '×'); x.type = 'button'; x.title = T('Streep weghalen', 'Remove stripe');
+        x.onclick = function () { editStyle(set).stripes.splice(si, 1); changed(); renderPanel(); };
+        row.appendChild(el('span', '', T('vanaf', 'from'))); row.appendChild(p1); row.appendChild(el('span', '', T('breed', 'wide'))); row.appendChild(p2);
+        row.appendChild(colorIn(function () { return sp.c; }, function (v) { st().c = v; }, T('Kleur van de streep', 'Stripe color'))); row.appendChild(x);
+        g.appendChild(row);
+      });
+      if (cur.stripes.length < 8) {
+        var add = el('button', 'btn small', T('+ Streep', '+ Stripe')); add.type = 'button';
+        add.onclick = function () { var e = editStyle(set); e.stripes.push({ u0: 0.6 + e.stripes.length * 0.6, u1: 0.9 + e.stripes.length * 0.6, c: cur.ink }); changed(); renderPanel(); };
+        g.appendChild(add);
+      }
     }
-    var o = S.opts;
-    s3.appendChild(el('h3', '', T('Op het label', 'On the label')));
-    s3.appendChild(check(T('Tussenstreepjes', 'Minor ticks'), function () { return o.minors; }, function (v) { o.minors = v; }));
-    s3.appendChild(check(T('Lensnaam onderaan', 'Lens name at the bottom'), function () { return o.lensText; }, function (v) { o.lensText = v; }));
-    s3.appendChild(check(T('T-stop bovenaan', 'T-stop at the top'), function () { return o.topExtra; }, function (v) { o.topExtra = v; }));
-    var ch = el('div', 'sub flat'); ch.appendChild(document.createTextNode(T('Hoeken', 'Corners')));
-    ch.appendChild(selIn(CORNERS(0.9, 3), function () { return numOr(o.corner, 0.9); }, function (v) { o.corner = Number(v); }));
-    ch.appendChild(document.createTextNode(T('Rand', 'Border')));
-    ch.appendChild(selIn([['', T('geen', 'none')], ['line', T('dunne snijlijn', 'thin cut line')], ['thin', T('zwarte rand', 'black border')]],
-      function () { return o.edge || ''; }, function (v) { o.edge = v; }));
-    s3.appendChild(ch);
-    if (EDGES[o.edge]) s3.appendChild(el('p', 'hint', o.edge === 'line'
-      ? T('Een dunne grijze lijn om het label, de lensdoppen en de lenslijst. Snij op de lijn.', 'A thin grey line around the label, the lens caps and the lens list. Cut on the line.')
-      : T('Een zwarte rand om het label, de lensdoppen en de lenslijst. Snij langs de buitenkant: de rand blijft op het label staan.', 'A black border around the label, the lens caps and the lens list. Cut along the outside: the border stays on the label.')));
-    if (numOr(o.corner, 0.9) === 0) s3.appendChild(el('p', 'hint', T('Ook de uitsparing voor de nudge is nu recht: drie rechte sneden.', 'The cutout for the nudge is straight as well: three straight cuts.')));
-    s3.appendChild(el('h3', '', T('Lettertype', 'Font')));
+
+    // lettertype
     var fonts = [{ key: '', label: 'Barlow', group: 'strak' }].concat(Engine.fontList());
     var fontNl = { Classic: 'Klassiek', Script: 'Sierschrift' };
     // een lettertype dat niet meer bestaat valt terug op de standaard
     var curFont = fonts.some(function (f) { return f.key === o.font; }) ? o.font : '';
-    [['strak', T('Strak', 'Clean')], ['apart', T('Apart', 'Quirky')]].forEach(function (g) {
-      var list = fonts.filter(function (f) { return (f.group || 'strak') === g[0]; }); if (!list.length) return;
-      s3.appendChild(el('h4', 'fgroup', g[1]));
+    var cf = fonts.filter(function (f) { return f.key === curFont; })[0];
+    g = group(s3, 'letter', T('Lettertype', 'Font'), T(fontNl[cf.label] || cf.label, cf.label));
+    [['strak', T('Strak', 'Clean')], ['apart', T('Apart', 'Quirky')]].forEach(function (gr) {
+      var list = fonts.filter(function (f) { return (f.group || 'strak') === gr[0]; }); if (!list.length) return;
+      g.appendChild(el('h4', 'fgroup', gr[1]));
       var fl = el('div', 'fonts');
       list.forEach(function (f) {
         var b = el('button', 'fbtn' + (curFont === f.key ? ' on' : '')); b.type = 'button';
@@ -347,51 +429,92 @@
         b.onclick = function () { o.font = f.key; changed(); renderPanel(); };
         fl.appendChild(b);
       });
-      s3.appendChild(fl);
+      g.appendChild(fl);
     });
-    s3.appendChild(el('h3', '', T('Extra op het vel', 'Extras on the sheet')));
-    s3.appendChild(check(T('Stickers voor de lensdoppen', 'Stickers for the lens caps'), function () { return o.caps.on; }, function (v) { o.caps.on = v; }));
+
+    // schaal en tekst
+    g = group(s3, 'schaal', T('Schaal en tekst', 'Scale and text'));
+    g.appendChild(check(T('Tussenstreepjes', 'Minor ticks'), function () { return o.minors; }, function (v) { o.minors = v; }));
+    g.appendChild(check(T('Lensnaam onderaan', 'Lens name at the bottom'), function () { return o.lensText; }, function (v) { o.lensText = v; }));
+    g.appendChild(check(T('T-stop bovenaan', 'T-stop at the top'), function () { return o.topExtra; }, function (v) { o.topExtra = v; }));
+    g.appendChild(slider(T('Lijndikte van de streepjes', 'Thickness of the ticks'), function () { return numOr(o.lineScale, 1); }, function (v) { o.lineScale = v; }, 0.4, 2.4, 0.05, function (v) { return mm(0.5 * v); }));
+
+    // vorm
+    var f = shape();
+    g = group(s3, 'vorm', T('Vorm van het label', 'Shape of the label'));
+    g.appendChild(slider(T('Hoeken boven', 'Top corners'), function () { return f.top; }, function (v) { o.cornerTop = v; }, 0, 6, 0.1, function (v) { return v ? mm(v) : T('recht', 'straight'); }));
+    g.appendChild(slider(T('Hoeken onder', 'Bottom corners'), function () { return f.bottom; }, function (v) { o.cornerBottom = v; }, 0, 9.5, 0.1, function (v) { return v ? mm(v) : T('recht', 'straight'); }));
+    var nt = el('div', 'sub flat'); nt.appendChild(document.createTextNode(T('Uitsparing voor de nudge', 'Cutout for the nudge')));
+    nt.appendChild(selIn([['round', T('rond', 'round')], ['square', T('recht', 'straight')]], function () { return f.square ? 'square' : 'round'; }, function (v) { o.notch = v; }));
+    g.appendChild(nt);
+    g.appendChild(el('p', 'hint', T('Niets om rondingen te snijden? Zet beide hoeken op 0 en de uitsparing op recht: dan zijn het alleen rechte sneden.', 'Nothing to cut curves with? Set both corners to 0 and the cutout to straight: then every cut is straight.')));
+
+    // rand
+    g = group(s3, 'rand', T('Rand om het label', 'Border around the label'), o.edge === 'line' ? T('snijlijn', 'cut line') : o.edge === 'thin' ? T('rand', 'border') : T('geen', 'none'));
+    var ed = el('div', 'sub flat'); ed.appendChild(document.createTextNode(T('Rand', 'Border')));
+    ed.appendChild(selIn([['', T('geen', 'none')], ['line', T('dunne snijlijn', 'thin cut line')], ['thin', T('rand in kleur', 'colored border')]], function () { return o.edge === 'line' || o.edge === 'thin' ? o.edge : ''; }, function (v) { o.edge = v; }));
+    g.appendChild(ed);
+    if (o.edge === 'thin') {
+      g.appendChild(slider(T('Lijndikte', 'Thickness'), function () { return numOr(o.edgeW, 0.35); }, function (v) { o.edgeW = v; }, 0.1, 2, 0.05, function (v) { return mm(v); }));
+      var e2 = el('div', 'sub flat'); e2.appendChild(document.createTextNode(T('Kleur', 'Color')));
+      e2.appendChild(colorIn(function () { return o.edgeColor || '#111111'; }, function (v) { o.edgeColor = v; }, T('Kleur van de rand', 'Border color')));
+      e2.appendChild(document.createTextNode(T('Plaats', 'Position')));
+      e2.appendChild(selIn([['in', T('binnen de snijlijn', 'inside the cut line')], ['center', T('op de snijlijn', 'on the cut line')], ['out', T('buiten de snijlijn', 'outside the cut line')]], function () { return o.edgePos || 'in'; }, function (v) { o.edgePos = v; }));
+      g.appendChild(e2);
+    }
+    if (o.edge) g.appendChild(el('p', 'hint', o.edge === 'line'
+      ? T('Een dunne grijze lijn om het label, de lensdoppen en de lenslijst. Snij op de lijn.', 'A thin grey line around the label, the lens caps and the lens list. Cut on the line.')
+      : T('De rand komt om het label, de lensdoppen en de lenslijst.', 'The border goes around the label, the lens caps and the lens list.')));
+
+    // lensdoppen
+    g = group(s3, 'doppen', T('Lensdoppen', 'Lens caps'), o.caps.on ? T('aan', 'on') : T('uit', 'off'));
+    g.appendChild(check(T('Stickers voor de lensdoppen', 'Stickers for the lens caps'), function () { return o.caps.on; }, function (v) { o.caps.on = v; }));
     if (o.caps.on) {
       var c1 = el('div', 'sub'); c1.appendChild(document.createTextNode(T('Doorsnede', 'Diameter'))); c1.appendChild(numIn(function () { return o.caps.d; }, function (v) { o.caps.d = v; }, 20, 100)); c1.appendChild(document.createTextNode('mm'));
       c1.appendChild(selIn([['1', T('1 per lens', '1 per lens')], ['2', T('2 per lens', '2 per lens')]], function () { return o.caps.n; }, function (v) { o.caps.n = Number(v); }));
-      s3.appendChild(c1);
+      g.appendChild(c1);
       var c1s = el('div', 'sub'); c1s.appendChild(document.createTextNode(T('Vorm', 'Shape')));
       c1s.appendChild(selIn([['round', T('rond', 'round')], ['soft', T('vierkant, ronde hoeken', 'square, rounded corners')], ['square', T('vierkant, recht', 'square, straight')]],
         function () { return o.caps.shape || 'round'; }, function (v) { o.caps.shape = v; }));
-      s3.appendChild(c1s);
+      g.appendChild(c1s);
       var c1b = el('div', 'sub'); c1b.appendChild(document.createTextNode(T('Achtergrond', 'Background')));
       c1b.appendChild(selIn(BGS(), function () { return o.caps.bg || 'set'; }, function (v) { o.caps.bg = v; }));
-      s3.appendChild(c1b);
+      if (set && o.caps.bg === 'solid') c1b.appendChild(colorIn(function () { return solidOf(set); }, function (v) { set.solid = v; }, T('Effen kleur', 'Solid color')));
+      g.appendChild(c1b);
     }
-    s3.appendChild(check(T('Lenslijst voor op de camera', 'Lens list for the camera'), function () { return o.list.on; }, function (v) { o.list.on = v; }));
+
+    // lenslijst
+    g = group(s3, 'lijst', T('Lenslijst voor op de camera', 'Lens list for the camera'), o.list.on ? T('aan', 'on') : T('uit', 'off'));
+    g.appendChild(check(T('Lenslijst meeprinten', 'Print the lens list'), function () { return o.list.on; }, function (v) { o.list.on = v; }));
     if (o.list.on) {
       var c2 = el('div', 'sub'); c2.appendChild(document.createTextNode(T('Zijde', 'Side'))); c2.appendChild(numIn(function () { return o.list.size; }, function (v) { o.list.size = v; }, 30, 90)); c2.appendChild(document.createTextNode('mm'));
       c2.appendChild(selIn([['1', '1×'], ['2', '2×']], function () { return o.list.n; }, function (v) { o.list.n = Number(v); }));
-      s3.appendChild(c2);
+      g.appendChild(c2);
       var c2s = el('div', 'sub'); c2s.appendChild(document.createTextNode(T('Hoeken', 'Corners')));
       c2s.appendChild(selIn(CORNERS(2.5, 6), function () { return numOr(o.list.corner, 2.5); }, function (v) { o.list.corner = Number(v); }));
-      s3.appendChild(c2s);
+      g.appendChild(c2s);
       var c2b = el('div', 'sub'); c2b.appendChild(document.createTextNode(T('Achtergrond', 'Background')));
       c2b.appendChild(selIn(BGS(), function () { return o.list.bg || 'set'; }, function (v) { o.list.bg = v; }));
-      s3.appendChild(c2b);
+      if (set && o.list.bg === 'solid') c2b.appendChild(colorIn(function () { return solidOf(set); }, function (v) { set.solid = v; }, T('Effen kleur', 'Solid color')));
+      g.appendChild(c2b);
     }
-    // één effen kleur voor doppen en lijst, per set te kiezen
-    if (set && ((o.caps.on && o.caps.bg === 'solid') || (o.list.on && o.list.bg === 'solid'))) {
-      var cs = el('div', 'sub'); cs.style.marginLeft = '0'; cs.appendChild(document.createTextNode(T('Effen kleur voor ', 'Solid color for ') + set.name));
-      var ci = el('input'); ci.type = 'color'; ci.value = solidOf(set); ci.setAttribute('aria-label', T('Effen kleur', 'Solid color'));
-      ci.oninput = function () { set.solid = ci.value; changed(); };
-      cs.appendChild(ci); s3.appendChild(cs);
-    }
+    P.appendChild(s3);
+
+    // ---- 4. printen ----
+    var s4 = el('section', 'step'); s4.appendChild(stepHead(4, T('Printen', 'Print')));
     var pn = el('div', 'printnote');
     pn.appendChild(el('b', '', T('Print op 100%', 'Print at 100%')));
     pn.appendChild(document.createTextNode(T('Kies in het printvenster "Vergroot/verklein: 100%", niet "Maak passend". Meet daarna de liniaal onderaan het vel na: 0 tot 10 hoort precies 100 mm te zijn.',
       'In the print dialog choose "Scale: 100%", not "Scale to fit". Then check the ruler at the bottom of the sheet: 0 to 10 should be exactly 100 mm.')));
-    s3.appendChild(pn);
-    if (S.sets.length > 1) {
-      var allb = el('button', 'btn small', T('PDF van alle sets', 'PDF of all sets')); allb.type = 'button'; allb.style.marginTop = '12px'; allb.onclick = function () { makePdf(true); };
-      s3.appendChild(allb);
-    }
-    P.appendChild(s3);
+    s4.appendChild(pn);
+    var prow = el('div', 'row'); prow.style.marginTop = '12px';
+    var ready = !!(set && set.lenses.length);
+    var bp = el('button', 'btn small', T('Printen', 'Print')); bp.type = 'button'; bp.disabled = !ready; bp.onclick = printNow;
+    var bd = el('button', 'btn small primary', T('PDF downloaden', 'Download PDF')); bd.type = 'button'; bd.disabled = !ready; bd.onclick = function () { makePdf(false); };
+    prow.appendChild(bp); prow.appendChild(bd);
+    if (S.sets.length > 1) { var allb = el('button', 'btn small', T('PDF van alle sets', 'PDF of all sets')); allb.type = 'button'; allb.onclick = function () { makePdf(true); }; prow.appendChild(allb); }
+    s4.appendChild(prow);
+    P.appendChild(s4);
 
     var foot = el('div', 'foot');
     var ex = el('button', 'linkbtn', T('Bibliotheek bewaren', 'Save library')); ex.type = 'button';

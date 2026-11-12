@@ -788,7 +788,14 @@ var Engine = (function () {
   }
 
   // ---------- strook opbouwen ----------
-  function buildStrip(lens, ring, style, x0, y0, opts) { return withScale(ring, function () { return buildStrip0(lens, ring, style, x0, y0, opts); }); }
+  // dikte van de streepjes: k = 1 is standaard (lange streep 0,5 mm); de indeling rekent met de gekozen dikte
+  function withLines(k, fn) {
+    k = Number(k); if (!isFinite(k) || Math.abs(k - 1) < 0.01) return fn();
+    k = clamp(k, 0.4, 3);
+    var L0 = L; L = Object.assign({}, L0, { lineMajor: L0.lineMajor * k, lineMinor: L0.lineMinor * k, lineShort: L0.lineShort * k });
+    try { return fn(); } finally { L = L0; }
+  }
+  function buildStrip(lens, ring, style, x0, y0, opts) { return withLines(opts && opts.lineScale, function () { return withScale(ring, function () { return buildStrip0(lens, ring, style, x0, y0, opts); }); }); }
   function buildStrip0(lens, ring, style, x0, y0, opts) {
     opts = opts || {};
     style = normalizeStyle(style);
@@ -1260,7 +1267,7 @@ var Engine = (function () {
 
       lenses.slice(p * perPage, (p + 1) * perPage).forEach(function (lens, k) {
         var x0 = PAGE.firstX + k * pitch, y0 = PAGE.stripTop - ring.top;
-        var st = buildStrip(lens, ring, style, x0, y0, { minors: job.minors !== false, lensText: job.lensText !== false, topExtra: job.topExtra !== false });
+        var st = buildStrip(lens, ring, style, x0, y0, { minors: job.minors !== false, lensText: job.lensText !== false, topExtra: job.topExtra !== false, lineScale: job.lineScale });
         // omlijning: binnen = op het label, center = half op de snijlijn, out = buiten het label
         var ol = style.outline, sitems = st.items.slice();
         if (ol.on && ol.pos === 'out') page.items.push({ stroke: ol.color, width: ol.width * 2, contours: [st.clip] });
