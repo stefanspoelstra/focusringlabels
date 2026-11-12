@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.3 · 12-11-2026';
+  var VERSION = '2.4 · 12-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -28,8 +28,8 @@
   if (!STYLE_KEYS.length) STYLE_KEYS = Object.keys(Engine.STYLES).slice(0, 12);
   function sol(c) { return { mode: 'solid', c: [c, c, c, c] }; }
   function gy(stops) { var a = stops[0][1], z = stops[stops.length - 1][1]; return { mode: 'y', c: [a, a, z, z], stops: stops }; }
-  function mk(label, o) {
-    return { label: label, group: 'Op de set', ink: o.ink || '#111111', bandL: o.bandL === undefined ? 1.61 : o.bandL, split: o.split === undefined ? 11.27 : o.split,
+  function mk(label, o, group) {
+    return { label: label, group: group || 'Op de set', ink: o.ink || '#111111', bandL: o.bandL === undefined ? 1.61 : o.bandL, split: o.split === undefined ? 11.27 : o.split,
       bandR: o.bandR || 0, fullFill: !!o.full, zones: { bandL: o.band, left: o.left, right: o.right || o.left, bandR: o.bandRc || o.band }, stripes: o.stripes || [] };
   }
   // eigen stijlen met een knipoog naar de set: klapbord, kleurbalken, false color, waveform en meer
@@ -48,8 +48,25 @@
     'set-tally': mk('Tally', { band: sol('#ff1a1a'), bandL: 2.2, left: sol('#141414'), right: sol('#1f1f1f'), ink: '#ffffff', stripes: [{ u0: 18.9, u1: 19.39, c: '#ff1a1a' }] }),
     'set-log': mk('Log', { band: sol('#8b8982'), left: sol('#bcbab3'), right: sol('#a8a69f'), ink: '#2b2b2b' })
   };
-  var ALL = {}; Object.keys(Engine.STYLES).forEach(function (k) { ALL[k] = Engine.STYLES[k]; }); Object.keys(EXTRA).forEach(function (k) { ALL[k] = EXTRA[k]; });
-  var GROUPS = [['Effen', 'Solid'], ['Donker', 'Dark'], ['Verloop', 'Gradient'], ['Heel label', 'Full label'], ['Speciaal', 'Special'], ['Creatief', 'Creative'], ['Op de set', 'On set']];
+  // retro: eigen ontwerpen in de sfeer van vroeger. De strepen zitten in de rand, zodat de cijfers vrij blijven.
+  function bars(cols, u0, w) { return cols.map(function (c, i) { return { u0: u0 + i * w, u1: u0 + (i + 1) * w, c: c }; }); }
+  function rt(label, o) { return mk(label, o, 'Retro'); }
+  var RETRO = {
+    'retro-70': rt('Jaren 70', { band: sol('#f6ecd6'), bandL: 3.6, split: 11.8, left: sol('#f6ecd6'), right: sol('#ecdcb8'), ink: '#3b2414', stripes: bars(['#5a3420', '#d9662b', '#e2a72e'], 0, 0.95) }),
+    'retro-ijssalon': rt('IJssalon', { band: sol('#fffaf0'), bandL: 4.0, split: 11.9, left: sol('#fffaf0'), right: sol('#fdeede'), ink: '#3a2a2a', stripes: bars(['#f59bb0', '#fbbf8f', '#f7df8a', '#9fdcbb'], 0, 0.9) }),
+    'retro-cassette': rt('Cassette', { band: sol('#1a1a1a'), bandL: 3.7, split: 11.9, bandR: 0.8, left: sol('#fbf6ea'), right: sol('#efe6d2'), ink: '#1a1a1a', stripes: bars(['#e23b2e', '#f28c28', '#f6c445'], 1.0, 0.9) }),
+    'retro-diner': rt('Diner', { band: sol('#d8232a'), bandL: 1.5, bandR: 0.9, left: sol('#e3f6ec'), right: sol('#c5ead9'), ink: '#1c2b2a', stripes: [{ u0: 1.5, u1: 1.85, c: '#ffffff' }, { u0: 1.85, u1: 2.15, c: '#d8232a' }] }),
+    'retro-surf': rt('Surf', { band: sol('#ff6f59'), bandL: 1.6, left: sol('#fff3dc'), right: sol('#8fdcd5'), ink: '#143a3a', stripes: [{ u0: 1.6, u1: 2.0, c: '#1a8f8a' }, { u0: 2.3, u1: 2.5, c: '#1a8f8a' }] }),
+    'retro-sepia': rt('Sepia', { band: sol('#6b4a2b'), bandL: 1.3, full: true, left: gy([[0, '#f6ead0'], [1, '#dcc396']]), ink: '#3a2614' }),
+    'retro-bakeliet': rt('Bakeliet', { band: sol('#f1dfb8'), bandL: 1.2, left: sol('#3a2317'), right: sol('#4a2d1e'), ink: '#f6e7c8', stripes: [{ u0: 1.55, u1: 1.8, c: '#c9973b' }] }),
+    'retro-zonsondergang': rt('Zonsondergang', { band: sol('#2a1030'), bandL: 1.3, full: true, left: gy([[0, '#ffe29a'], [0.35, '#ffb37a'], [0.7, '#ff8fa3'], [1, '#c9a0f0']]), ink: '#2a1030' }),
+    'retro-disco': rt('Disco', { band: sol('#f2c14e'), bandL: 1.4, bandR: 0.8, full: true, left: gy([[0, '#3b1466'], [1, '#8a2394']]), ink: '#ffffff' }),
+    'retro-vhs': rt('Videoband', { band: sol('#16161a'), bandL: 2.4, left: sol('#16161a'), right: sol('#22222b'), ink: '#ffffff', stripes: bars(['#19c2c2', '#e0409a', '#f5d547'], 0, 0.8) }),
+    'retro-arcade': rt('Speelhal', { band: sol('#ff3c6f'), bandL: 1.2, bandR: 0.8, bandRc: sol('#3fe0ff'), left: sol('#0b1030'), right: sol('#141a4a'), ink: '#ffffff', stripes: [{ u0: 1.5, u1: 1.8, c: '#ffe14d' }] }),
+    'retro-amber': rt('Amber scherm', { band: sol('#ffb000'), bandL: 1.0, left: sol('#120a00'), right: sol('#1e1200'), ink: '#ffb000' })
+  };
+  var ALL = {}; Object.keys(Engine.STYLES).forEach(function (k) { ALL[k] = Engine.STYLES[k]; }); Object.keys(EXTRA).forEach(function (k) { ALL[k] = EXTRA[k]; }); Object.keys(RETRO).forEach(function (k) { ALL[k] = RETRO[k]; });
+  var GROUPS = [['Effen', 'Solid'], ['Donker', 'Dark'], ['Verloop', 'Gradient'], ['Heel label', 'Full label'], ['Speciaal', 'Special'], ['Creatief', 'Creative'], ['Op de set', 'On set'], ['Retro', 'Retro']];
   function customStyle(c) { return { label: 'Eigen', ink: c.ink, bandL: 1.61, split: 11.27, bandR: 0, zones: { bandL: sol(c.band), left: sol(c.left), right: sol(c.right), bandR: sol(c.band) } }; }
   // set.edit = een stijl die je zelf hebt aangepast (kleurvlakken, verloop, strepen); anders de gekozen stijl uit de lijst
   function styleOf(set) { return set.edit || (set.custom ? customStyle(set.custom) : (ALL[set.styleKey] || ALL[STYLE_KEYS[0]])); }
@@ -187,6 +204,20 @@
     var o = S.opts, c = numOr(o.corner, 0.9);
     return { top: numOr(o.cornerTop, c), bottom: numOr(o.cornerBottom, c), square: o.notch ? o.notch === 'square' : c === 0 };
   }
+  // rand van lensdoppen of lenslijst: zoals het label (undefined), een eigen kleur, of geen rand (false)
+  function ownEdge(q) {
+    if (q.edge === 'none') return false;
+    if (q.edge !== 'own') return undefined;
+    var e = edge() || {};
+    return { on: true, pos: e.pos && e.color !== '#8a8a8a' ? e.pos : 'in', width: numOr(S.opts.edgeW, 0.35), color: /^#[0-9a-f]{6}$/i.test(q.edgeColor || '') ? q.edgeColor : '#111111' };
+  }
+  function edgeRow(q, label) {
+    var r = el('div', 'sub'); r.appendChild(document.createTextNode(T('Rand', 'Border')));
+    r.appendChild(selIn([['same', T('zoals het label', 'same as the label')], ['own', T('eigen kleur', 'own color')], ['none', T('geen rand', 'no border')]],
+      function () { return q.edge === 'own' || q.edge === 'none' ? q.edge : 'same'; }, function (v) { q.edge = v; }));
+    if (q.edge === 'own') r.appendChild(colorIn(function () { return q.edgeColor || '#111111'; }, function (v) { q.edgeColor = v; }, label));
+    return r;
+  }
   function edge() {
     var o = S.opts;
     if (o.edge === 'line') return { on: true, pos: 'center', width: 0.15, color: '#8a8a8a' };
@@ -200,8 +231,8 @@
     if (ol) { style = Object.assign({}, style); style.outline = ol; }
     return { ring: { preset: S.ring, cornerTop: f.top, cornerBottom: f.bottom, notchSquare: f.square }, style: style, name: set.name, lenses: set.lenses,
       minors: o.minors !== false, lensText: o.lensText !== false, topExtra: o.topExtra !== false, lineScale: numOr(o.lineScale, 1),
-      caps: !!o.caps.on, capD: capSize(), capCount: o.caps.n, capRound: CAP_ROUND[o.caps.shape] === undefined ? 100 : CAP_ROUND[o.caps.shape], capGap: CAP_GAP, capBg: o.caps.bg || 'set', capColor: solidOf(set),
-      lensList: { on: !!o.list.on, size: o.list.size, n: o.list.n, bg: o.list.bg, color: solidOf(set), corner: numOr(o.list.corner, 2.5) } };
+      caps: !!o.caps.on, capD: capSize(), capCount: o.caps.n, capRound: CAP_ROUND[o.caps.shape] === undefined ? 100 : CAP_ROUND[o.caps.shape], capGap: CAP_GAP, capBg: o.caps.bg || 'set', capColor: solidOf(set), capOutline: ownEdge(o.caps),
+      lensList: { on: !!o.list.on, size: o.list.size, n: o.list.n, bg: o.list.bg, color: solidOf(set), corner: numOr(o.list.corner, 2.5), outline: ownEdge(o.list) } };
   }
   function today() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return LANG === 'en' ? d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) : p(d.getDate()) + '-' + p(d.getMonth() + 1) + '-' + d.getFullYear(); }
   function pagesFor(set) { Engine.setLabelFont(S.opts.font || ''); return Engine.buildSheets(jobFor(set), { date: today() }); }
@@ -475,7 +506,7 @@
     }
     if (o.edge) g.appendChild(el('p', 'hint', o.edge === 'line'
       ? T('Een dunne grijze lijn om het label, de lensdoppen en de lenslijst. Snij op de lijn.', 'A thin grey line around the label, the lens caps and the lens list. Cut on the line.')
-      : T('De rand komt om het label, de lensdoppen en de lenslijst.', 'The border goes around the label, the lens caps and the lens list.')));
+      : T('De rand komt om het label, de lensdoppen en de lenslijst. Bij Lensdoppen en Lenslijst kun je daar een eigen kleur voor kiezen.', 'The border goes around the label, the lens caps and the lens list. Under Lens caps and Lens list you can pick a separate color.')));
 
     // lensdoppen
     g = group(s3, 'doppen', T('Lensdoppen', 'Lens caps'), o.caps.on ? T('aan', 'on') : T('uit', 'off'));
@@ -505,6 +536,7 @@
       c1b.appendChild(selIn(BGS(), function () { return o.caps.bg || 'set'; }, function (v) { o.caps.bg = v; }));
       if (set && o.caps.bg === 'solid') c1b.appendChild(colorIn(function () { return solidOf(set); }, function (v) { set.solid = v; }, T('Effen kleur', 'Solid color')));
       g.appendChild(c1b);
+      g.appendChild(edgeRow(o.caps, T('Kleur van de rand om de lensdoppen', 'Border color of the lens caps')));
     }
 
     // lenslijst
@@ -521,6 +553,7 @@
       c2b.appendChild(selIn(BGS(), function () { return o.list.bg || 'set'; }, function (v) { o.list.bg = v; }));
       if (set && o.list.bg === 'solid') c2b.appendChild(colorIn(function () { return solidOf(set); }, function (v) { set.solid = v; }, T('Effen kleur', 'Solid color')));
       g.appendChild(c2b);
+      g.appendChild(edgeRow(o.list, T('Kleur van de rand om de lenslijst', 'Border color of the lens list')));
     }
     P.appendChild(s3);
 

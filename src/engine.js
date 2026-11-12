@@ -960,6 +960,12 @@ var Engine = (function () {
   }
   // effen achtergrond voor lensdop of lenslijst: 'white' = wit, 'solid' = één gekozen kleur, anders de kleuren van de set
   function flatBg(bg, color) { return bg === 'white' ? '#ffffff' : bg === 'solid' && isHex(color) ? color : null; }
+  // eigen rand voor lensdop of lenslijst: undefined = zoals het label, false = geen rand, anders { width, color, pos }
+  function outlineOf(o, fallback) {
+    if (o === undefined || o === null) return fallback;
+    if (!o) return { on: false, width: fallback.width, color: fallback.color, pos: fallback.pos };
+    return { on: o.on !== false, width: clamp(num(o.width, 0.4), 0.05, 3), color: isHex(o.color) ? o.color : '#111111', pos: ['in', 'center', 'out'].indexOf(o.pos) > -1 ? o.pos : 'in' };
+  }
   function inkOn(hex) {
     var n = parseInt(String(hex).slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] > 0.32 ? '#111111' : '#ffffff';
@@ -1014,7 +1020,7 @@ var Engine = (function () {
   }
   // instellingen voor de lensdoppen uit de opdracht van een map
   function capConfig(job) {
-    var style = normalizeStyle(job.style), ol = style.outline;
+    var style = normalizeStyle(job.style), ol = outlineOf(job.capOutline, style.outline);
     var D = clamp(Number(job.capD) || 40, 15, 120), per = Number(job.capCount) === 2 ? 2 : 1;
     // afronding 0..100 (%): 0 = vierkant, 100 = rond; oudere instelling 'shape' telt nog mee
     var roundPct = job.capRound !== undefined && job.capRound !== null && isFinite(Number(job.capRound)) ? Number(job.capRound) : (job.capShape === 'round' ? 100 : 0);
@@ -1091,9 +1097,9 @@ var Engine = (function () {
   function listConfig(job) {
     var o = job.lensList || {}, style = normalizeStyle(job.style);
     var lenses = (job.lenses || []).filter(function (l) { return l.include !== false; });
-    return { S: clamp(Number(o.size) || 50, 30, 90), n: Number(o.n) === 2 ? 2 : 1, flat: flatBg(o.bg, o.color), style: style, ol: style.outline,
+    return { S: clamp(Number(o.size) || 50, 30, 90), n: Number(o.n) === 2 ? 2 : 1, flat: flatBg(o.bg, o.color), style: style, ol: outlineOf(o.outline, style.outline),
       corner: o.corner !== undefined && o.corner !== null && isFinite(Number(o.corner)) ? clamp(Number(o.corner), 0, 12) : 2.5,
-      lenses: lenses, name: String(job.name || '').trim(), gap: 4, bleed: style.outline.on ? 0 : 1 };
+      lenses: lenses, name: String(job.name || '').trim(), gap: 4, bleed: outlineOf(o.outline, style.outline).on ? 0 : 1 };
   }
   function listSizeTxt(cfg) { var d = cfg.S % 1 ? 1 : 0; return fmt(cfg.S, d) + ' × ' + fmt(cfg.S, d) + ' MM'; }
   function buildLensList(cfg, x0, y0) {
