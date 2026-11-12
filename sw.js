@@ -1,6 +1,6 @@
 // Pullmark: service worker. Bewaart de app in de browser, zodat hij ook zonder internet werkt (bijvoorbeeld op de set).
 // Bij een nieuwe versie haalt hij alles opnieuw op en neemt hij het direct over; de open app herlaadt dan één keer.
-const VERSION = '6df9853a63';
+const VERSION = 'c6c73269dc';
 const CACHE = 'frl-' + VERSION;
 const ASSETS = ["./", "index.html", "manifest.webmanifest", "meetlabel-wcu4-ring.pdf", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.svg"];
 

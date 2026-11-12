@@ -129,3 +129,9 @@ label.check { display:flex; align-items:center; gap:8px; padding:3px 0; cursor:p
 .zone input[type=number] { width:58px; border:1px solid var(--line); border-radius:6px; padding:3px 6px; color:var(--ink); }
 .zone .x { border:0; background:none; color:var(--muted); cursor:pointer; font-size:17px; line-height:1; padding:2px; margin-left:auto; }
 .btn:disabled { opacity:.45; cursor:default; }
+.cutlist { margin:8px 0 10px; display:flex; flex-direction:column; gap:6px; }
+.cutrow { display:flex; flex-wrap:wrap; gap:3px 10px; align-items:baseline; font-size:13px; color:var(--muted); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+.cutrow b { color:var(--ink); }
+.cutrow strong { color:var(--ink); font-weight:600; }
+.cutrow .w { color:var(--warn); flex-basis:100%; }
+.steps { margin:12px 0 0; padding-left:20px; font-size:13.5px; color:var(--ink); display:flex; flex-direction:column; gap:6px; }

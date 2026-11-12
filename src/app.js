@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.4 · 12-11-2026';
+  var VERSION = '2.6 · 12-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -33,6 +33,7 @@
       bandR: o.bandR || 0, fullFill: !!o.full, zones: { bandL: o.band, left: o.left, right: o.right || o.left, bandR: o.bandRc || o.band }, stripes: o.stripes || [] };
   }
   // eigen stijlen met een knipoog naar de set: klapbord, kleurbalken, false color, waveform en meer
+  function bars(cols, u0, w) { return cols.map(function (c, i) { return { u0: u0 + i * w, u1: u0 + (i + 1) * w, c: c }; }); }
   var EXTRA = {
     'set-klapbord': mk('Klapbord', { band: sol('#ffffff'), bandL: 2.4, left: sol('#111111'), right: sol('#1d1d1d'), ink: '#ffffff', stripes: [{ u0: 0.6, u1: 1.2, c: '#111111' }, { u0: 1.8, u1: 2.4, c: '#111111' }] }),
     'set-kleurbalken': mk('Kleurbalken', { band: sol('#c0c0c0'), bandL: 3.5, split: 11.6, left: sol('#f5f5f5'), right: sol('#e4e4e4'),
@@ -44,12 +45,11 @@
     'set-kelvin': mk('Tungsten / daglicht', { band: gy([[0, '#ff9a3c'], [1, '#4f9dff']]), left: sol('#ffdcae'), right: sol('#bfdcff') }),
     'set-goudenuur': mk('Gouden uur', { band: sol('#b85c1e'), full: true, left: gy([[0, '#ffe7a6'], [0.5, '#ffb97f'], [1, '#ff9494']]), ink: '#2a1505' }),
     'set-blauwuur': mk('Blauw uur', { band: sol('#f2b56b'), full: true, left: gy([[0, '#16254f'], [0.55, '#27457f'], [1, '#3a6f9a']]), ink: '#ffffff' }),
-    'set-greenscreen': mk('Greenscreen', { band: sol('#0d5a1a'), left: sol('#3ddc52'), right: sol('#2cc441'), ink: '#06210b' }),
+    'set-greenscreen': mk('Greenscreen', { band: sol('#0d5a1a'), bandL: 1.4, bandR: 0.7, left: sol('#3ddc52'), right: sol('#2cc441'), ink: '#06210b', stripes: [{ u0: 1.7, u1: 2.0, c: '#ff8a1f' }, { u0: 2.3, u1: 2.45, c: '#ff8a1f' }] }),
     'set-tally': mk('Tally', { band: sol('#ff1a1a'), bandL: 2.2, left: sol('#141414'), right: sol('#1f1f1f'), ink: '#ffffff', stripes: [{ u0: 18.9, u1: 19.39, c: '#ff1a1a' }] }),
-    'set-log': mk('Log', { band: sol('#8b8982'), left: sol('#bcbab3'), right: sol('#a8a69f'), ink: '#2b2b2b' })
+    'set-log': mk('Grijskaart', { band: sol('#8b8982'), bandL: 2.7, split: 11.8, left: sol('#bcbab3'), right: sol('#a8a69f'), ink: '#1f1f1f', stripes: bars(['#151515', '#7b7b78', '#f4f4f1'], 0, 0.9) })
   };
   // retro: eigen ontwerpen in de sfeer van vroeger. De strepen zitten in de rand, zodat de cijfers vrij blijven.
-  function bars(cols, u0, w) { return cols.map(function (c, i) { return { u0: u0 + i * w, u1: u0 + (i + 1) * w, c: c }; }); }
   function rt(label, o) { return mk(label, o, 'Retro'); }
   var RETRO = {
     'retro-70': rt('Jaren 70', { band: sol('#f6ecd6'), bandL: 3.6, split: 11.8, left: sol('#f6ecd6'), right: sol('#ecdcb8'), ink: '#3b2414', stripes: bars(['#5a3420', '#d9662b', '#e2a72e'], 0, 0.95) }),
@@ -65,8 +65,37 @@
     'retro-arcade': rt('Speelhal', { band: sol('#ff3c6f'), bandL: 1.2, bandR: 0.8, bandRc: sol('#3fe0ff'), left: sol('#0b1030'), right: sol('#141a4a'), ink: '#ffffff', stripes: [{ u0: 1.5, u1: 1.8, c: '#ffe14d' }] }),
     'retro-amber': rt('Amber scherm', { band: sol('#ffb000'), bandL: 1.0, left: sol('#120a00'), right: sol('#1e1200'), ink: '#ffb000' })
   };
-  var ALL = {}; Object.keys(Engine.STYLES).forEach(function (k) { ALL[k] = Engine.STYLES[k]; }); Object.keys(EXTRA).forEach(function (k) { ALL[k] = EXTRA[k]; }); Object.keys(RETRO).forEach(function (k) { ALL[k] = RETRO[k]; });
-  var GROUPS = [['Effen', 'Solid'], ['Donker', 'Dark'], ['Verloop', 'Gradient'], ['Heel label', 'Full label'], ['Speciaal', 'Special'], ['Creatief', 'Creative'], ['Op de set', 'On set'], ['Retro', 'Retro']];
+  // nieuwe stijlen in dezelfde opzet als de retroset: één helder idee per stijl, een klein palet en strepen in de rand
+  function nw(group, label, o) { return mk(label, o, group); }
+  var MORE = {
+    // rustig: weinig inkt, alle aandacht naar de cijfers
+    'rustig-kantlijn': nw('Rustig', 'Kantlijn', { band: sol('#ffffff'), bandL: 0, left: sol('#ffffff'), right: sol('#fbfaf6'), ink: '#16181b', stripes: [{ u0: 1.0, u1: 1.22, c: '#e23b2e' }] }),
+    'rustig-potlood': nw('Rustig', 'Potlood', { band: sol('#b4b8bd'), bandL: 1.0, left: sol('#fafafa'), right: sol('#eff0f2'), ink: '#3a3e45' }),
+    // donker: de drie bestaande stijlen krijgen een bies, net als de nieuwe
+    'nacht': nw('Donker', 'Nacht', { band: sol('#22d3ee'), bandL: 1.3, left: sol('#0f1b2d'), right: sol('#1d3557'), ink: '#ffffff', stripes: [{ u0: 1.6, u1: 1.85, c: '#f4f1de' }] }),
+    'grafiet': nw('Donker', 'Grafiet', { band: sol('#ffb000'), bandL: 1.3, left: sol('#1f1f1f'), right: sol('#363636'), ink: '#ffffff', stripes: [{ u0: 1.6, u1: 1.85, c: '#ffe9b0' }] }),
+    'bordeaux': nw('Donker', 'Bordeaux', { band: sol('#ff6f91'), bandL: 1.3, left: sol('#2a0d16'), right: sol('#4a1426'), ink: '#ffffff', stripes: [{ u0: 1.6, u1: 1.85, c: '#f2c14e' }] }),
+    'donker-dennen': nw('Donker', 'Dennenbos', { band: sol('#b6f09c'), bandL: 1.3, left: sol('#0f2a1d'), right: sol('#17402b'), ink: '#ffffff', stripes: [{ u0: 1.6, u1: 1.85, c: '#f2c14e' }] }),
+    'donker-petrol': nw('Donker', 'Petrol', { band: sol('#ff7a59'), bandL: 1.3, left: sol('#0d3038'), right: sol('#14464f'), ink: '#ffffff', stripes: [{ u0: 1.6, u1: 1.85, c: '#f6e7c8' }] }),
+    'donker-inkt': nw('Donker', 'Inkt', { band: sol('#ffffff'), bandL: 1.1, bandR: 0.6, left: sol('#0c0c0c'), right: sol('#1c1c1c'), ink: '#ffffff' }),
+    // verloop: één kleurfamilie per stijl, zodat ze echt van elkaar verschillen
+    'heel-lagune': nw('Verloop', 'Lagune', { band: sol('#0b3c5d'), bandL: 1.3, full: true, left: gy([[0, '#eafff5'], [0.5, '#a8e6e0'], [1, '#6fb3ee']]), ink: '#071a2b' }),
+    'verloop-koraal': nw('Verloop', 'Koraal', { band: sol('#b23a48'), bandL: 1.3, full: true, left: gy([[0, '#fff1e6'], [0.5, '#ffc9b0'], [1, '#ff9a9a']]), ink: '#2a0d12' }),
+    'verloop-mist': nw('Verloop', 'Ochtendmist', { band: sol('#3d4a6b'), bandL: 1.3, full: true, left: gy([[0, '#f6f8fc'], [0.5, '#dbe5f3'], [1, '#cfcdee']]), ink: '#1b2238' }),
+    // natuur
+    'natuur-woestijn': nw('Natuur', 'Woestijn', { band: sol('#8a4b2a'), bandL: 1.4, full: true, left: gy([[0, '#fcebc9'], [0.5, '#f3cc90'], [1, '#e2a575']]), ink: '#3a1f10', stripes: [{ u0: 1.7, u1: 1.95, c: '#3f8f88' }] }),
+    'natuur-lavendel': nw('Natuur', 'Lavendel', { band: sol('#5b4b8a'), bandL: 1.4, left: sol('#f5f1fc'), right: sol('#dcd0f4'), ink: '#221a3a', stripes: [{ u0: 1.7, u1: 1.95, c: '#8fbf7f' }] })
+  };
+  var ALL = {};
+  [Engine.STYLES, EXTRA, MORE, RETRO].forEach(function (src) { Object.keys(src).forEach(function (k) { ALL[k] = src[k]; }); });
+  // bestaande stijlen een betere plek of naam geven; 'Oud' = uit de lijst gehaald, maar een set die hem al gebruikt houdt hem
+  function move(k, group, label) { var st = {}; Object.keys(ALL[k]).forEach(function (q) { st[q] = ALL[k][q]; }); st.group = group; if (label) st.label = label; ALL[k] = st; }
+  move('minimaal', 'Rustig'); move('hoog-contrast', 'Rustig');
+  move('heel-zomer', 'Verloop', 'Zomer'); move('heel-nacht', 'Verloop', 'Schemering');
+  move('jungle', 'Natuur'); move('lava', 'Natuur'); move('ijs', 'Natuur'); move('citrus', 'Natuur');
+  move('holo', 'Creatief', 'Parelmoer');
+  ['dubbele-rand', 'rechts-accent', 'verloop', 'zonsondergang', 'koper', 'heel-roos', 'retro', 'avondrood', 'pastel-duo'].forEach(function (k) { move(k, 'Oud'); });
+  var GROUPS = [['Effen', 'Solid'], ['Rustig', 'Calm'], ['Donker', 'Dark'], ['Verloop', 'Gradient'], ['Natuur', 'Nature'], ['Creatief', 'Creative'], ['Op de set', 'On set'], ['Retro', 'Retro']];
   function customStyle(c) { return { label: 'Eigen', ink: c.ink, bandL: 1.61, split: 11.27, bandR: 0, zones: { bandL: sol(c.band), left: sol(c.left), right: sol(c.right), bandR: sol(c.band) } }; }
   // set.edit = een stijl die je zelf hebt aangepast (kleurvlakken, verloop, strepen); anders de gekozen stijl uit de lijst
   function styleOf(set) { return set.edit || (set.custom ? customStyle(set.custom) : (ALL[set.styleKey] || ALL[STYLE_KEYS[0]])); }
@@ -254,6 +283,50 @@
       .then(function (bytes) { downloadBlob(name, new Blob([bytes], { type: 'application/pdf' })); })
       .catch(function (e) { msgs.push(T('PDF maken mislukt: ', 'Making the PDF failed: ') + (e && e.message || e)); render(); });
   }
+  // ---------- snijmachine (Cricut) ----------
+  // De opdracht voor de snijmachine: randen staan binnen de snijlijn, en de dunne grijze snijlijn vervalt (de machine snijdt zelf).
+  var PTC = { w: 183, h: 269.8 };   // snijvlak van Print Then Cut op A4, in mm
+  function cutJob(set) {
+    var j = jobFor(set), o = S.opts;
+    function inside(q) { if (!q || q.on === false) return q; var r = {}; Object.keys(q).forEach(function (k) { r[k] = q[k]; }); r.pos = 'in'; return r; }
+    j.style = Object.assign({}, j.style);
+    if (o.edge === 'line') delete j.style.outline; else if (j.style.outline) j.style.outline = inside(j.style.outline);
+    if (j.capOutline) j.capOutline = inside(j.capOutline);
+    j.lensList = Object.assign({}, j.lensList); if (j.lensList.outline) j.lensList.outline = inside(j.lensList.outline);
+    return j;
+  }
+  // hoeveel stroken naast elkaar in één afbeelding: weinig, want een hoge afbeelding mag bij Print Then Cut niet ook breed zijn
+  function cutPer() { var n = Number(S.opts.cutPer); return n >= 1 && n <= 6 ? Math.floor(n) : 5; }
+  function cutSheets(set) {
+    Engine.setLabelFont(S.opts.font || '');
+    var W = Engine.ringFor({ preset: S.ring }).W, pitch = W >= 19 ? Engine.PAGE.pitch : Math.max(W + 7, 12);
+    return Engine.buildCutSheets(cutJob(set), { ruler: S.opts.cutRuler !== false, maxH: PTC.h, maxW: (cutPer() - 1) * pitch + W + 0.1 });
+  }
+  function cm(v) { var t = (Math.round(v * 10) / 100).toFixed(2); return LANG === 'en' ? t : t.replace('.', ','); }
+  function cutExport() {
+    var set = activeSet(); if (!set) return;
+    var sheets = cutSheets(set), i = 0;
+    (function next() {
+      if (i >= sheets.length) return;
+      var sh = sheets[i], w = sh.box[2], h = sh.box[3];
+      // zo scherp als kan, binnen wat elke browser als afbeelding aankan
+      var dpi = Math.min(600, Math.floor(Math.sqrt(16e6 / ((w / 25.4) * (h / 25.4)))));
+      var pw = Math.round(w / 25.4 * dpi), ph = Math.round(h / 25.4 * dpi);
+      var svg = Engine.pageSVG({ items: sh.items }, { viewBox: sh.box, size: [pw, ph], background: false, idPrefix: 'cx' + i });
+      var url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), img = new Image();
+      var name = 'Pullmark_' + safe(set.name) + '_Cricut_' + (i + 1) + '_' + T('hoogte', 'height') + '-' + (Math.round(h * 10) / 100).toFixed(2) + 'cm.png';
+      img.onload = function () {
+        var c = document.createElement('canvas'); c.width = pw; c.height = ph; c.getContext('2d').drawImage(img, 0, 0, pw, ph); URL.revokeObjectURL(url);
+        c.toBlob(function (b) {
+          if (!b) { msgs.push(T('De afbeelding voor de Cricut maken mislukte.', 'Making the image for the Cricut failed.')); render(); return; }
+          downloadBlob(name, b); i++; setTimeout(next, 500);
+        }, 'image/png');
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); msgs.push(T('De afbeelding voor de Cricut maken mislukte.', 'Making the image for the Cricut failed.')); render(); };
+      img.src = url;
+    })();
+  }
+
   function printNow() {
     var set = activeSet(); if (!set) return;
     $('printArea').innerHTML = pagesFor(set).map(function (p, i) { return Engine.pageSVG(p, { idPrefix: 'pr' + i }); }).join('');
@@ -571,6 +644,42 @@
     prow.appendChild(bp); prow.appendChild(bd);
     if (S.sets.length > 1) { var allb = el('button', 'btn small', T('PDF van alle sets', 'PDF of all sets')); allb.type = 'button'; allb.onclick = function () { makePdf(true); }; prow.appendChild(allb); }
     s4.appendChild(prow);
+    // snijmachine
+    if (ready) {
+      var gc = group(s4, 'cricut', T('Snijden met een Cricut', 'Cutting with a Cricut'));
+      gc.appendChild(el('p', 'hint', T('Een Cricut snijdt alleen wat je vanuit zijn eigen programma (Design Space) print. Daarvoor maakt Pullmark een afbeelding van alleen de labels, met een doorzichtige achtergrond. De Cricut snijdt langs de rand van elk label.',
+        'A Cricut only cuts what you print from its own software (Design Space). For that, Pullmark makes an image of just the labels, with a transparent background. The Cricut cuts along the edge of each label.')));
+      gc.appendChild(check(T('Maatstrook meesturen, om de schaal na te meten', 'Include a ruler strip, to check the scale'), function () { return S.opts.cutRuler !== false; }, function (v) { S.opts.cutRuler = v; }));
+      var cp = el('div', 'sub flat'); cp.appendChild(document.createTextNode(T('Stroken per afbeelding', 'Strips per image')));
+      cp.appendChild(selIn([['6', '6'], ['5', '5'], ['4', '4'], ['3', '3'], ['2', '2']], function () { return String(cutPer()); }, function (v) { S.opts.cutPer = Number(v); }));
+      gc.appendChild(cp);
+      gc.appendChild(el('p', 'hint', T('Het snijvlak van de Cricut is in de hoeken kleiner, omdat daar de markeringen staan. Een hoge afbeelding mag daarom niet te breed zijn. Zegt Design Space dat een afbeelding te groot is, kies hier dan minder stroken.',
+        'The cutting area of the Cricut is smaller in the corners, because the marks are printed there. A tall image therefore cannot be too wide. If Design Space says an image is too large, pick fewer strips here.')));
+      var sheets = cutSheets(set), ul = el('div', 'cutlist');
+      sheets.forEach(function (sh, i) {
+        var what = [sh.strips ? sh.strips + (sh.strips === 1 ? T(' strook', ' strip') : T(' stroken', ' strips')) : '', sh.caps ? sh.caps + (sh.caps === 1 ? T(' lensdop', ' lens cap') : T(' lensdoppen', ' lens caps')) : '', sh.lists ? T('lenslijst', 'lens list') : ''].filter(Boolean).join(', ');
+        var row = el('div', 'cutrow'); row.appendChild(el('b', '', T('Afbeelding ', 'Image ') + (i + 1)));
+        row.appendChild(el('span', '', what)); row.appendChild(el('strong', '', T('hoogte ', 'height ') + cm(sh.box[3]) + ' cm')); row.appendChild(el('span', '', T('breedte ', 'width ') + cm(sh.box[2]) + ' cm'));
+        if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer onder. Meet een strook na.', 'The ruler strip does not fit below this one. Measure a strip instead.')));
+        if (sh.box[2] > PTC.w + 0.05 || sh.box[3] > PTC.h + 0.05) row.appendChild(el('span', 'w', T('Te groot voor Print Then Cut op A4 (18,3 × 27,0 cm).', 'Too large for Print Then Cut on A4 (18.3 × 27.0 cm).')));
+        ul.appendChild(row);
+      });
+      gc.appendChild(ul);
+      var bc = el('button', 'btn small primary', T('Afbeelding voor Cricut downloaden', 'Download image for Cricut')); bc.type = 'button'; bc.onclick = cutExport;
+      gc.appendChild(bc);
+      var ol2 = el('ol', 'steps');
+      [T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
+        T('Zet de afbeelding op het werkblad. Laat het slotje dicht en vul bij Grootte de hoogte in die hierboven staat. Die maat staat ook in de bestandsnaam. Dit bepaalt of de schaal klopt.', 'Place the image on the canvas. Keep the lock closed and enter the height shown above under Size. It is also in the file name. This decides whether the scale is right.'),
+        T('Meldt Design Space dat de afbeelding te groot is? Kies dan nooit "Automatisch aanpassen" (Auto-Resize): dat verkleint je labels en dan klopt de schaal niet meer. Kies hierboven minder stroken per afbeelding en exporteer opnieuw.', 'Does Design Space say the image is too large? Never choose "Auto-Resize": that shrinks your labels and the scale will be wrong. Pick fewer strips per image above and export again.'),
+        T('Kies Maken en print vanuit Design Space op A4. Zet de systeemdialoog aan en print op 100%, niet passend gemaakt. Laat "afloop" (bleed) aan staan.', 'Choose Make and print from Design Space on A4. Turn on the system dialog and print at 100%, not scaled to fit. Leave "bleed" on.'),
+        T('Leg het vel op de snijmat en laat de Cricut snijden.', 'Put the sheet on the cutting mat and let the Cricut cut.'),
+        (sheets.length && sheets[0].ruler
+          ? T('Meet de maatstrook na voor je plakt: van 0 tot 10 hoort precies 100 mm te zijn. Klopt dat niet, pas dan de hoogte in Design Space aan.', 'Measure the ruler strip before you stick anything on: 0 to 10 should be exactly 100 mm. If not, adjust the height in Design Space.')
+          : T('Meet één label na voor je plakt: een strook hoort ', 'Measure one label before you stick it on: a strip should be ') + mm(Engine.ringFor({ preset: S.ring }).length) + T(' lang te zijn.', ' long.'))
+      ].forEach(function (t) { ol2.appendChild(el('li', '', t)); });
+      gc.appendChild(ol2);
+      gc.appendChild(el('p', 'hint', T('Let op: dit is nog niet met een echte Cricut getest. Snij eerst één vel op gewoon papier.', 'Note: this has not been tested with a real Cricut yet. Cut one sheet of plain paper first.')));
+    }
     P.appendChild(s4);
 
     var foot = el('div', 'foot');

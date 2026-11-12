@@ -1027,7 +1027,7 @@ var Engine = (function () {
     var round = clamp(roundPct, 0, 100) / 100;
     var gap = job.capGap !== undefined && job.capGap !== null && isFinite(Number(job.capGap)) ? clamp(Number(job.capGap), 0, 15) : 4;
     // met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn: een kleine afwijking bij het snijden valt dan niet op
-    var bleed = !ol.on && gap >= 2 ? Math.min(1, gap / 2 - 0.5) : 0;
+    var bleed = job.noBleed ? 0 : (!ol.on && gap >= 2 ? Math.min(1, gap / 2 - 0.5) : 0);
     var list = [];
     (job.lenses || []).filter(function (l) { return l.include !== false; }).forEach(function (l) { for (var i = 0; i < per; i++) list.push(l); });
     return { style: style, ol: ol, D: D, round: round, gap: gap, bleed: bleed, list: list, lensText: job.lensText !== false, topExtra: job.topExtra !== false, bg: job.capBg, color: job.capColor };
@@ -1099,7 +1099,7 @@ var Engine = (function () {
     var lenses = (job.lenses || []).filter(function (l) { return l.include !== false; });
     return { S: clamp(Number(o.size) || 50, 30, 90), n: Number(o.n) === 2 ? 2 : 1, flat: flatBg(o.bg, o.color), style: style, ol: outlineOf(o.outline, style.outline),
       corner: o.corner !== undefined && o.corner !== null && isFinite(Number(o.corner)) ? clamp(Number(o.corner), 0, 12) : 2.5,
-      lenses: lenses, name: String(job.name || '').trim(), gap: 4, bleed: outlineOf(o.outline, style.outline).on ? 0 : 1 };
+      lenses: lenses, name: String(job.name || '').trim(), gap: 4, bleed: job.noBleed || outlineOf(o.outline, style.outline).on ? 0 : 1 };
   }
   function listSizeTxt(cfg) { var d = cfg.S % 1 ? 1 : 0; return fmt(cfg.S, d) + ' × ' + fmt(cfg.S, d) + ' MM'; }
   function buildLensList(cfg, x0, y0) {
@@ -1248,6 +1248,68 @@ var Engine = (function () {
     return pages;
   }
 
+  // Afbeeldingen voor een snijmachine (bijvoorbeeld Cricut Print Then Cut): alleen de labels zelf, zonder tekst, liniaal en
+  // snijlijnen, strak bijgesneden. De vorm van elk label is precies de snijlijn; de machine volgt de rand van de afbeelding.
+  // Het snijvlak van Print Then Cut is geen volle rechthoek: in de vier hoeken staan de markeringen. Een hoge afbeelding mag
+  // daarom niet ook breed zijn. Dus: de stroken (hoog) blijven smal, hooguit maxW breed, en de lensdoppen en de lenslijst
+  // komen in een eigen, lage afbeelding. box = [x, y, breedte, hoogte] in mm.
+  function buildCutSheets(job, opts) {
+    opts = opts || {};
+    var j = {}, out = [], k; for (k in job) j[k] = job[k];
+    j.noBleed = true;
+    var maxW = opts.maxW || 125, maxH = opts.maxH || 269.8;
+    var ring = ringFor(j.ring), pitch = ring.W >= 19 ? PAGE.pitch : Math.max(ring.W + 7, 12);
+    var per = Math.max(1, Math.floor((maxW - ring.W + 0.05) / pitch) + 1);
+    function finish(pageItems) {
+      var items = pageItems.filter(function (it) { return it.clip; });
+      if (!items.length) return;
+      var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      items.forEach(function (it) { it.clip.forEach(function (c) { for (var i = 1; i + 1 < c.length; i += 2) { x0 = Math.min(x0, c[i]); x1 = Math.max(x1, c[i]); y0 = Math.min(y0, c[i + 1]); y1 = Math.max(y1, c[i + 1]); } }); });
+      // wit onder elk label: zo zit er nergens een doorzichtige naad tussen twee kleurvlakken
+      var cut = items.map(function (it) { return { clip: it.clip, items: [{ fill: '#ffffff', contours: [it.clip] }].concat(it.items) }; });
+      // maatstrook onder de labels: 0 tot 10 cm, om na het printen en snijden de schaal na te meten.
+      // Hij wordt als los stukje uitgesneden. Past hij niet meer binnen maxH, dan blijft hij weg.
+      var ruler = false, RH = 8, RGAP = 4;
+      if (opts.ruler && (y1 - y0) + RGAP + RH <= maxH + 0.01) {
+        var ry = y1 + RGAP, sh = [], clip = polyCmds([[x0, ry], [x0 + 110, ry], [x0 + 110, ry + RH], [x0, ry + RH]]);
+        for (var t = 0; t <= 100; t++) {
+          var hgt = t % 10 === 0 ? 3.0 : t % 5 === 0 ? 2.0 : 1.2, tx = x0 + 5 + t;
+          sh.push(polyCmds([[tx - 0.06, ry], [tx + 0.06, ry], [tx + 0.06, ry + hgt], [tx - 0.06, ry + hgt]]));
+          if (t % 10 === 0) (function (tx, lab) {
+            var off = textWidth(lab, 400, 1.6, 0.05) / 2;
+            sh.push(textContours(lab, 400, 1.6, 0.05, function (fx, fy) { return [tx - off + fx, ry + 5.6 - fy]; }));
+          })(tx, String(t / 10));
+        }
+        sh.push(textContours(say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM'), 400, 1.3, 0.08, function (fx, fy) { return [x0 + 16 + fx, ry + 7.5 - fy]; }));
+        cut.push({ clip: clip, items: [{ fill: '#ffffff', contours: [clip] }, { fill: '#111111', contours: sh }] });
+        x1 = Math.max(x1, x0 + 110); y1 = ry + RH; ruler = true;
+      }
+      out.push({ items: cut, ruler: ruler, box: [x0, y0, x1 - x0, y1 - y0],
+        strips: items.filter(function (it) { return !it.cap && !it.list; }).length,
+        caps: items.filter(function (it) { return it.cap; }).length, lists: items.filter(function (it) { return it.list; }).length });
+    }
+    // 1. stroken: smal en hoog
+    buildPages(j, { perPage: per }).forEach(function (p) { finish(p.items); });
+    // 2. lensdoppen en lenslijst: in een eigen afbeelding, ook hooguit maxW breed
+    var caps = j.caps ? capConfig(j) : null, list = caps ? caps.list.slice() : [];
+    var lc = j.lensList && j.lensList.on ? listConfig(j) : null, left = lc && lc.lenses.length ? lc.n : 0;
+    var room = maxH - (opts.ruler ? 12 : 0), guard = 0;
+    while ((list.length || left > 0) && guard++ < 12) {
+      var page = { items: [], strips: [] }, y = 0;
+      if (list.length) {
+        var cols = Math.max(1, Math.floor((maxW + caps.gap) / (caps.D + caps.gap)));
+        var n = fillCaps(page, list, caps, 0, Math.max(maxW, caps.D), 0, room, false);
+        if (!n) { list = []; } else { list = list.slice(n); y = Math.ceil(n / cols) * (caps.D + caps.gap); }
+      }
+      if (!list.length && left > 0) {
+        var got = fillLists(page, lc, left, 0, Math.max(maxW, lc.S), y - 4, room);
+        if (!got && !page.items.length) left = 0; else left -= got;
+      }
+      finish(page.items);
+    }
+    return out;
+  }
+
   function buildPages(job, opts) {
     opts = opts || {};
     var ring = ringFor(job.ring);
@@ -1256,6 +1318,7 @@ var Engine = (function () {
     // smalle labels: dichter op elkaar en meer per vel (standaardlabel: 7 per vel, zoals altijd)
     var pitch = ring.W >= 19 ? PAGE.pitch : Math.max(ring.W + 7, 12);
     var perPage = ring.W >= 19 ? PAGE.perPage : Math.max(1, Math.floor((210 - 2 * PAGE.firstX + (pitch - ring.W)) / pitch));
+    if (opts.perPage) perPage = Math.max(1, Math.min(perPage, Math.floor(opts.perPage)));
     var pages = [], n = Math.max(1, Math.ceil(lenses.length / perPage));
     var dateStr = opts.date || '';
     for (var p = 0; p < n; p++) {
@@ -1613,7 +1676,7 @@ var Engine = (function () {
     pageSVG: pageSVG, buildPDF: buildPDF, textWidth: textWidth, distOf: distOf, buildCalibPages: buildCalibPages,
     setLang: setLang, lang: function () { return LANG; }, cornerRadii: cornerRadii,
     addFont: addFont, setLabelFont: setLabelFont, fontList: fontList, fontSample: fontSample,
-    distText: distText, measuredPts: measuredPts, buildCapPages: buildCapPages, buildSheets: buildSheets
+    distText: distText, measuredPts: measuredPts, buildCapPages: buildCapPages, buildSheets: buildSheets, buildCutSheets: buildCutSheets
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine;
