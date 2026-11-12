@@ -1057,7 +1057,8 @@ var Engine = (function () {
     }
     return nFit;
   }
-  function capPages(list, cfg, job, opts) {
+  // center = stickers midden op het vel; komt de lenslijst eronder, dan links uitgelijnd (zelfde linkerrand)
+  function capPages(list, cfg, job, opts, center) {
     var top = 22, bottom = 274, pages = [];
     var cols = Math.max(1, Math.floor((210 - 2 * PAGE.firstX + cfg.gap) / (cfg.D + cfg.gap)));
     var rows = Math.max(1, Math.floor((bottom - top + cfg.gap) / (cfg.D + cfg.gap)));
@@ -1073,7 +1074,7 @@ var Engine = (function () {
       rulerShapes(shapes);
       page.items.push({ fill: '#222222', contours: shapes });
       var chunk = list.slice(p * perPage, (p + 1) * perPage);
-      fillCaps(page, chunk, cfg, PAGE.firstX, 210 - PAGE.firstX, top, bottom, true);
+      fillCaps(page, chunk, cfg, PAGE.firstX, 210 - PAGE.firstX, top, bottom, center !== false);
       page.capY1 = top + Math.ceil(chunk.length / cols) * (cfg.D + cfg.gap);   // onderkant van de stickers: daaronder is ruimte voor de lenslijst
       pages.push(page);
     }
@@ -1206,10 +1207,15 @@ var Engine = (function () {
       var st = last.strips[last.strips.length - 1];
       free = { page: last, x0: st.x0 + st.ring.W + 6, x1: 210 - PAGE.firstX, y0: 22, y1: 274, used: false };
     }
+    // lensdoppen en lenslijst krijgen dezelfde linkerrand, zodat je die in één snede meeneemt.
+    // Past de lenslijst net niet naast de stroken, dan schuiven beide 3 mm naar de laatste strook toe.
+    var lc = job.lensList && job.lensList.on ? listConfig(job) : null;
+    if (lc && !lc.lenses.length) lc = null;
+    var xLeft = free ? (lc && lc.S > free.x1 - free.x0 ? free.x0 - 3 : free.x0) : 0;
     if (job.caps) {
       var cfg = capConfig(job), list = cfg.list;
       if (list.length && free) {
-        var x0 = free.x0, x1 = free.x1;
+        var x0 = xLeft, x1 = free.x1;
         var nFit = fillCaps(last, list, cfg, x0, x1, free.y0, free.y1, false);
         if (nFit) {
           last.capsIn = nFit;
@@ -1223,19 +1229,15 @@ var Engine = (function () {
         }
       }
       if (list.length) {
-        var cp = capPages(list, cfg, job, opts), lp = cp[cp.length - 1];
+        var cp = capPages(list, cfg, job, opts, !lc), lp = cp[cp.length - 1];
         pages = pages.concat(cp);
         if (lp) free = { page: lp, x0: PAGE.firstX, x1: 210 - PAGE.firstX, y0: lp.capY1 + 1.5, y1: 274, used: true };
       }
     }
-    if (job.lensList && job.lensList.on) {
-      var lc = listConfig(job);
-      if (lc.lenses.length) {
-        // naast de stroken mag het kaartje 3 mm dichter bij de laatste strook dan de lensdoppen: dan past 50 mm nog naast vijf stroken
-        var got = free ? fillLists(free.page, lc, lc.n, free.page.caps ? free.x0 : free.x0 - 3, free.x1, free.used ? free.y0 : free.y0 - 4, free.y1) : 0;
-        if (got) free.page.listIn = got;
-        if (got < lc.n) pages = pages.concat(listPages(lc, lc.n - got, job, opts));
-      }
+    if (lc) {
+      var got = free ? fillLists(free.page, lc, lc.n, free.page.caps ? free.x0 : xLeft, free.x1, free.used ? free.y0 : free.y0 - 4, free.y1) : 0;
+      if (got) free.page.listIn = got;
+      if (got < lc.n) pages = pages.concat(listPages(lc, lc.n - got, job, opts));
     }
     return pages;
   }

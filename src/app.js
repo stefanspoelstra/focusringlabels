@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.1 · 12-11-2026';
+  var VERSION = '2.3 · 12-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -171,6 +171,17 @@
   // hoeken: 0 = recht (te snijden met mes en liniaal), anders de straal in mm
   function numOr(v, d) { return v === undefined || v === null || v === '' || !isFinite(Number(v)) ? d : Number(v); }
   var CAP_ROUND = { round: 100, soft: 25, square: 0 };
+  // lensdoppen even breed als de lenslijst: n stickers naast elkaar (met 4 mm ertussen) zijn samen precies zo breed
+  // als het kaartje, zodat ook de rechterrand in één snede meegaat. 0 = eigen maat.
+  var CAP_GAP = 4;
+  function listSize() { return Math.max(30, Math.min(90, Number(S.opts.list.size) || 50)); }
+  function fitD(n) { return Math.round((listSize() - (n - 1) * CAP_GAP) / n * 100) / 100; }
+  function capFit() {
+    var o = S.opts, f = o.caps.fit === undefined ? '2' : String(o.caps.fit);
+    if (!o.list.on || f === 'own') return 0;
+    var n = Number(f); return n >= 1 && n <= 3 && fitD(n) >= 15 ? n : 0;
+  }
+  function capSize() { var n = capFit(); return n ? fitD(n) : S.opts.caps.d; }
   // vorm van het label: hoeken boven en onder apart, en de uitsparing voor de nudge rond of recht
   function shape() {
     var o = S.opts, c = numOr(o.corner, 0.9);
@@ -189,7 +200,7 @@
     if (ol) { style = Object.assign({}, style); style.outline = ol; }
     return { ring: { preset: S.ring, cornerTop: f.top, cornerBottom: f.bottom, notchSquare: f.square }, style: style, name: set.name, lenses: set.lenses,
       minors: o.minors !== false, lensText: o.lensText !== false, topExtra: o.topExtra !== false, lineScale: numOr(o.lineScale, 1),
-      caps: !!o.caps.on, capD: o.caps.d, capCount: o.caps.n, capRound: CAP_ROUND[o.caps.shape] === undefined ? 100 : CAP_ROUND[o.caps.shape], capGap: 4, capBg: o.caps.bg || 'set', capColor: solidOf(set),
+      caps: !!o.caps.on, capD: capSize(), capCount: o.caps.n, capRound: CAP_ROUND[o.caps.shape] === undefined ? 100 : CAP_ROUND[o.caps.shape], capGap: CAP_GAP, capBg: o.caps.bg || 'set', capColor: solidOf(set),
       lensList: { on: !!o.list.on, size: o.list.size, n: o.list.n, bg: o.list.bg, color: solidOf(set), corner: numOr(o.list.corner, 2.5) } };
   }
   function today() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return LANG === 'en' ? d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) : p(d.getDate()) + '-' + p(d.getMonth() + 1) + '-' + d.getFullYear(); }
@@ -470,7 +481,20 @@
     g = group(s3, 'doppen', T('Lensdoppen', 'Lens caps'), o.caps.on ? T('aan', 'on') : T('uit', 'off'));
     g.appendChild(check(T('Stickers voor de lensdoppen', 'Stickers for the lens caps'), function () { return o.caps.on; }, function (v) { o.caps.on = v; }));
     if (o.caps.on) {
-      var c1 = el('div', 'sub'); c1.appendChild(document.createTextNode(T('Doorsnede', 'Diameter'))); c1.appendChild(numIn(function () { return o.caps.d; }, function (v) { o.caps.d = v; }, 20, 100)); c1.appendChild(document.createTextNode('mm'));
+      var fitN = capFit(), c1 = el('div', 'sub');
+      if (o.list.on) {
+        // maat: gelijk met de lenslijst (standaard) of een eigen maat
+        var fo = [];
+        [1, 2, 3].forEach(function (n) {
+          var d = fitD(n); if (d < 15) return;
+          fo.push([String(n), (n === 1 ? T('even breed als de lijst', 'as wide as the list') : n + T(' naast elkaar, gelijk met de lijst', ' side by side, flush with the list')) + ' (' + mm(d) + ')']);
+        });
+        fo.push(['own', T('eigen maat', 'own size')]);
+        var c0 = el('div', 'sub'); c0.appendChild(document.createTextNode(T('Maat', 'Size')));
+        c0.appendChild(selIn(fo, function () { return fitN ? String(fitN) : 'own'; }, function (v) { o.caps.fit = v; }));
+        g.appendChild(c0);
+      }
+      if (!fitN) { c1.appendChild(document.createTextNode(T('Doorsnede', 'Diameter'))); c1.appendChild(numIn(function () { return o.caps.d; }, function (v) { o.caps.d = v; }, 20, 100)); c1.appendChild(document.createTextNode('mm')); }
       c1.appendChild(selIn([['1', T('1 per lens', '1 per lens')], ['2', T('2 per lens', '2 per lens')]], function () { return o.caps.n; }, function (v) { o.caps.n = Number(v); }));
       g.appendChild(c1);
       var c1s = el('div', 'sub'); c1s.appendChild(document.createTextNode(T('Vorm', 'Shape')));
@@ -487,7 +511,7 @@
     g = group(s3, 'lijst', T('Lenslijst voor op de camera', 'Lens list for the camera'), o.list.on ? T('aan', 'on') : T('uit', 'off'));
     g.appendChild(check(T('Lenslijst meeprinten', 'Print the lens list'), function () { return o.list.on; }, function (v) { o.list.on = v; }));
     if (o.list.on) {
-      var c2 = el('div', 'sub'); c2.appendChild(document.createTextNode(T('Zijde', 'Side'))); c2.appendChild(numIn(function () { return o.list.size; }, function (v) { o.list.size = v; }, 30, 90)); c2.appendChild(document.createTextNode('mm'));
+      var c2 = el('div', 'sub'); c2.appendChild(document.createTextNode(T('Zijde', 'Side'))); c2.appendChild(numIn(function () { return o.list.size; }, function (v) { o.list.size = v; setTimeout(renderPanel, 0); }, 30, 90)); c2.appendChild(document.createTextNode('mm'));
       c2.appendChild(selIn([['1', '1×'], ['2', '2×']], function () { return o.list.n; }, function (v) { o.list.n = Number(v); }));
       g.appendChild(c2);
       var c2s = el('div', 'sub'); c2s.appendChild(document.createTextNode(T('Hoeken', 'Corners')));
