@@ -1280,7 +1280,11 @@ var Engine = (function () {
             sh.push(textContours(lab, 400, 1.6, 0.05, function (fx, fy) { return [tx - off + fx, ry + 5.6 - fy]; }));
           })(tx, String(t / 10));
         }
-        sh.push(textContours(say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM'), 400, 1.3, 0.08, function (fx, fy) { return [x0 + 16 + fx, ry + 7.5 - fy]; }));
+        // het formaat van deze afbeelding staat erbij: dat zijn de getallen die je in het snijprogramma invult
+        var bw = Math.max(x1 - x0, 110), bh = ry + RH - y0;
+        // in cm, zoals Design Space het vraagt
+        var note = say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM') + '   ·   ' + say('IN DESIGN SPACE: B ', 'IN DESIGN SPACE: W ') + fmt(bw / 10, 2) + ' × H ' + fmt(bh / 10, 2) + ' CM';
+        sh.push(textContours(note, 700, 1.3, 0.06, function (fx, fy) { return [x0 + 5 + fx, ry + 7.5 - fy]; }));
         cut.push({ clip: clip, items: [{ fill: '#ffffff', contours: [clip] }, { fill: '#111111', contours: sh }] });
         x1 = Math.max(x1, x0 + 110); y1 = ry + RH; ruler = true;
       }

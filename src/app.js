@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.6 · 12-11-2026';
+  var VERSION = '2.7 · 12-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -303,6 +303,31 @@
     return Engine.buildCutSheets(cutJob(set), { ruler: S.opts.cutRuler !== false, maxH: PTC.h, maxW: (cutPer() - 1) * pitch + W + 0.1 });
   }
   function cm(v) { var t = (Math.round(v * 10) / 100).toFixed(2); return LANG === 'en' ? t : t.replace('.', ','); }
+  // De echte maat ook in het bestand zelf zetten (PNG-blok pHYs, pixels per meter). Een programma dat dat leest, plaatst
+  // de afbeelding direct op de goede maat. Design Space doet dat niet altijd: daarom staan de maten ook in de naam en op de strook.
+  var CRC = null;
+  function crc32(u8) {
+    if (!CRC) { CRC = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; CRC[n] = c >>> 0; } }
+    var x = 0xffffffff; for (var i = 0; i < u8.length; i++) x = CRC[(x ^ u8[i]) & 255] ^ (x >>> 8); return (x ^ 0xffffffff) >>> 0;
+  }
+  function withDpi(blob, ppm, cb) {
+    if (!blob.arrayBuffer) { cb(blob); return; }
+    blob.arrayBuffer().then(function (buf) {
+      var src = new Uint8Array(buf), p = 8;
+      // staat er al een pHYs-blok in, dan laten we het bestand zoals het is
+      while (p + 8 <= src.length) {
+        var len = (src[p] << 24 | src[p + 1] << 16 | src[p + 2] << 8 | src[p + 3]) >>> 0, type = String.fromCharCode(src[p + 4], src[p + 5], src[p + 6], src[p + 7]);
+        if (type === 'pHYs') { cb(blob); return; }
+        if (type === 'IDAT' || type === 'IEND') break;
+        p += 12 + len;
+      }
+      var v = Math.round(ppm), ch = new Uint8Array(21), dv = new DataView(ch.buffer);
+      dv.setUint32(0, 9); ch.set([112, 72, 89, 115], 4); dv.setUint32(8, v); dv.setUint32(12, v); ch[16] = 1;
+      dv.setUint32(17, crc32(ch.subarray(4, 17)));
+      var out = new Uint8Array(src.length + 21); out.set(src.subarray(0, 33), 0); out.set(ch, 33); out.set(src.subarray(33), 54);
+      cb(new Blob([out], { type: 'image/png' }));
+    }).catch(function () { cb(blob); });
+  }
   function cutExport() {
     var set = activeSet(); if (!set) return;
     var sheets = cutSheets(set), i = 0;
@@ -314,12 +339,13 @@
       var pw = Math.round(w / 25.4 * dpi), ph = Math.round(h / 25.4 * dpi);
       var svg = Engine.pageSVG({ items: sh.items }, { viewBox: sh.box, size: [pw, ph], background: false, idPrefix: 'cx' + i });
       var url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })), img = new Image();
-      var name = 'Pullmark_' + safe(set.name) + '_Cricut_' + (i + 1) + '_' + T('hoogte', 'height') + '-' + (Math.round(h * 10) / 100).toFixed(2) + 'cm.png';
+      // de maten voor Design Space (in cm) staan in de bestandsnaam
+      var name = 'Pullmark_' + safe(set.name) + '_Cricut_' + (i + 1) + '_' + T('B', 'W') + cm(w) + '-H' + cm(h) + 'cm.png';
       img.onload = function () {
         var c = document.createElement('canvas'); c.width = pw; c.height = ph; c.getContext('2d').drawImage(img, 0, 0, pw, ph); URL.revokeObjectURL(url);
         c.toBlob(function (b) {
           if (!b) { msgs.push(T('De afbeelding voor de Cricut maken mislukte.', 'Making the image for the Cricut failed.')); render(); return; }
-          downloadBlob(name, b); i++; setTimeout(next, 500);
+          withDpi(b, pw / (w / 1000), function (b2) { downloadBlob(name, b2); i++; setTimeout(next, 500); });
         }, 'image/png');
       };
       img.onerror = function () { URL.revokeObjectURL(url); msgs.push(T('De afbeelding voor de Cricut maken mislukte.', 'Making the image for the Cricut failed.')); render(); };
@@ -659,7 +685,11 @@
       sheets.forEach(function (sh, i) {
         var what = [sh.strips ? sh.strips + (sh.strips === 1 ? T(' strook', ' strip') : T(' stroken', ' strips')) : '', sh.caps ? sh.caps + (sh.caps === 1 ? T(' lensdop', ' lens cap') : T(' lensdoppen', ' lens caps')) : '', sh.lists ? T('lenslijst', 'lens list') : ''].filter(Boolean).join(', ');
         var row = el('div', 'cutrow'); row.appendChild(el('b', '', T('Afbeelding ', 'Image ') + (i + 1)));
-        row.appendChild(el('span', '', what)); row.appendChild(el('strong', '', T('hoogte ', 'height ') + cm(sh.box[3]) + ' cm')); row.appendChild(el('span', '', T('breedte ', 'width ') + cm(sh.box[2]) + ' cm'));
+        row.appendChild(el('span', '', what));
+        // precies de getallen die je in Design Space bij Formaat invult (cm); inch voor wie Design Space in inch heeft staan
+        var inch = function (v) { var t = (v / 25.4).toFixed(3); return LANG === 'en' ? t : t.replace('.', ','); };
+        row.appendChild(el('strong', 'dims', T('B ', 'W ') + cm(sh.box[2]) + '   H ' + cm(sh.box[3]) + ' cm'));
+        row.appendChild(el('span', '', T('in inch: B ', 'in inches: W ') + inch(sh.box[2]) + ' × H ' + inch(sh.box[3])));
         if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer onder. Meet een strook na.', 'The ruler strip does not fit below this one. Measure a strip instead.')));
         if (sh.box[2] > PTC.w + 0.05 || sh.box[3] > PTC.h + 0.05) row.appendChild(el('span', 'w', T('Te groot voor Print Then Cut op A4 (18,3 × 27,0 cm).', 'Too large for Print Then Cut on A4 (18.3 × 27.0 cm).')));
         ul.appendChild(row);
@@ -669,7 +699,8 @@
       gc.appendChild(bc);
       var ol2 = el('ol', 'steps');
       [T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
-        T('Zet de afbeelding op het werkblad. Laat het slotje dicht en vul bij Grootte de hoogte in die hierboven staat. Die maat staat ook in de bestandsnaam. Dit bepaalt of de schaal klopt.', 'Place the image on the canvas. Keep the lock closed and enter the height shown above under Size. It is also in the file name. This decides whether the scale is right.'),
+        T('Zet de afbeelding op het werkblad. Hij komt meestal veel te groot binnen; dat is normaal. Laat het slotje dicht en vul bij Formaat de H in die hierboven staat, in cm (bijvoorbeeld 26,60). De B moet dan vanzelf de B van hierboven worden. Deze maten staan ook in de bestandsnaam en op de maatstrook in de afbeelding.',
+          'Place the image on the canvas. It usually comes in far too large; that is normal. Keep the lock closed and enter the H shown above under Size, in cm (for example 26.60). The W should then match the W shown above. These sizes are also in the file name and on the ruler strip in the image.'),
         T('Meldt Design Space dat de afbeelding te groot is? Kies dan nooit "Automatisch aanpassen" (Auto-Resize): dat verkleint je labels en dan klopt de schaal niet meer. Kies hierboven minder stroken per afbeelding en exporteer opnieuw.', 'Does Design Space say the image is too large? Never choose "Auto-Resize": that shrinks your labels and the scale will be wrong. Pick fewer strips per image above and export again.'),
         T('Kies Maken en print vanuit Design Space op A4. Zet de systeemdialoog aan en print op 100%, niet passend gemaakt. Laat "afloop" (bleed) aan staan.', 'Choose Make and print from Design Space on A4. Turn on the system dialog and print at 100%, not scaled to fit. Leave "bleed" on.'),
         T('Leg het vel op de snijmat en laat de Cricut snijden.', 'Put the sheet on the cutting mat and let the Cricut cut.'),
