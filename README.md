@@ -1,46 +1,66 @@
 # Pullmark
 
-**Focusringlabels voor focuspullers.** Web-app om labels voor je focusring te maken uit Tilta-lensbestanden (`.tl`), of door een lens zelf in te meten. Kant-en-klaar voor de Tilta ARRI-ring en de originele Tilta-ring op de Nucleus-M II; elke andere ring (bijvoorbeeld de ARRI WCU-4) meet je zelf in met het meetlabel. Voorheen heette de app Focusringlabels.
+**Focusringlabels voor focuspullers.** Web-app die labels voor je focusring maakt uit Tilta-lensbestanden (`.tl`). Voorheen heette de app Focusringlabels.
 
 **Openen:** https://stefanspoelstra.github.io/focusringlabels/
 
-**Taal:** Nederlands of Engels. Kies met het wereldbolletje rechtsboven in de app.
+**Taal:** Nederlands of Engels. Kies met de knop NL/EN rechtsboven.
 
-> **English:** Pullmark is a web app that makes focus ring labels from Tilta lens files (`.tl`), or from a lens you measure yourself, ready to go for the Tilta ARRI ring and the original Tilta ring on the Nucleus-M II; any other ring (the ARRI WCU-4, for example) you measure yourself with the calibration label. Open the link above; it starts in English unless your browser is set to Dutch. Switch language with the globe at the top right.
+> **English:** Pullmark is a web app that makes focus ring labels from Tilta lens files (`.tl`). Three steps: load your lenses, pick your ring, print. Open the link above; it starts in English unless your browser is set to Dutch.
 
-## Installeren op de Mac (Chrome)
+## Zo werkt het
 
-1. Open de link hierboven in Chrome.
-2. Klik op **Installeren als app** in de app zelf, of op het installatie-icoon rechts in de adresbalk.
-3. De app staat daarna in Launchpad en werkt ook zonder internet. Sleep hem naar je Dock.
+1. **Lenzen.** Sleep je `.tl`-bestanden of een hele map in de app. Lenzen van hetzelfde merk komen samen in een set. Een T-stop die niet in het bestand staat, vul je zelf in.
+2. **Ring.** Kies je ring. De WCU-4-ring is nagemeten; de twee Tilta-ringen nog niet met het nieuwe meetlabel.
+3. **Printen.** Kies per set een kleur, het lettertype, de hoeken en eventueel een rand. Print of download de pdf.
 
-Je lenzen en instellingen blijven op je eigen Mac. Ze staan niet in deze repository. Onder **Export → Bewaren** kun je de bibliotheek koppelen aan een bestand, dan wordt elke wijziging daar automatisch in bewaard.
+Je lenzen en instellingen blijven in je eigen browser. Onderaan kun je de bibliotheek bewaren als bestand en weer openen.
 
-## Hoe ∞ wordt bepaald (Tilta ARRI-ring)
+## Printen op ware grootte
 
-Een `.tl`-bestand zegt per afstand welke motorwaarde (0–10.000) erbij hoort, maar niet waar die op de ring ligt. Het profiel Tilta ARRI-ring heeft daarvoor één vaste meting: ∞ van de Dulens 21 mm (motorwaarde 9707) ligt 7,2 mm onder het midden van de nudge, bij 24,5 mm per 1000. Elke andere lens, van elk merk, volgt daaruit met zijn eigen `.tl`-waarden. Opnieuw meten kan per lens onder **Schaal nameten**.
+Kies in het printvenster **Vergroot/verklein: 100%**, niet "Maak passend". Meet daarna de liniaal onderaan het vel na: 0 tot 10 hoort precies 100 mm te zijn.
 
-**Originele Tilta-ring** (de kleinere ring die bij de Nucleus-M II zit): label 11 × 225 mm, dat begint tegen de onderkant van de nudge. Gemeten op de Dulens 21 mm: ∞ op 80,4 mm, schaal 21,88 mm per 1000 (24,5 × 225/252: hetzelfde wiel, een kleinere ring). De schaal loopt rond de nudge door, dus de korte afstanden staan bovenaan, en het brandpunt staat in het gat tussen de kortste afstand en ∞.
+## De WCU-4-ring op de Nucleus-M II
 
-## Eigen ring
+Een `.tl`-bestand zegt per afstand welke motorwaarde (0 tot 10.000) erbij hoort. Waar die waarde op de ring ligt, is gemeten met het meetlabel (`meetlabel-wcu4-ring.pdf`):
 
-Voor elke andere ring of handunit, bijvoorbeeld de ARRI WCU-4: kies het profiel **Eigen ring (zelf inmeten)**. Meet de hoogte van de ring en de lengte van de nudge rondom tot de andere kant van de nudge, en vul die in bij Label. Print daarna het meetlabel (0 tegen de nudge) en meet ∞ en de schaal in met **Schaal nameten**, of meet je lenzen helemaal in. De app levert alleen maten mee die zelf aan een ring zijn gemeten.
+- positie in mm onder het midden van de nudge = 24,5 × (10.000 − motorwaarde) / 1000
+- de ∞-aanslag (motorwaarde 10.000) ligt op het midden van de nudge
+- omtrek van de ring 254,5 mm, uitsparing 4,0 × 5,0 mm
 
-## Lens inmeten (zonder lensbestand)
+De nudge van de Tilta-handunit is smaller dan de uitsparing in de ring. Daardoor heeft de ring ongeveer 0,7 mm speling. Druk de ring bij het plakken en het aflezen steeds tegen dezelfde kant.
 
-Voor een lens zonder `.tl`-bestand, of een ander follow-focussysteem dan de Nucleus-M II: kies **Lens inmeten**. Print het meetlabel, plak het om de ring en lees per afstand op de lens af hoeveel mm hij van de nudge ligt. De app zet de streepjes precies op die plekken en rekent de tussenstreepjes ertussen uit (lineair in 1/afstand). Omdat je op de ring zelf meet, maken het systeem, de lensdata en de motorwaarden niet uit. De metingen horen wel bij de ring waarop je ze deed.
+## Extra's op het vel
 
-## Lensdoppen
+- **Lensdoppen:** stickers met het brandpunt, de T-stop en de lensnaam. Rond, vierkant met ronde hoeken of vierkant en recht.
+- **Lenslijst:** een kaartje (standaard 5 × 5 cm) met alle lenzen van de set en hun T-stop, voor op de camera.
+- Voor beide kies je de kleuren van de set, wit of één effen kleur.
 
-Onder **Opmaak › Lensdoppen** print je ook ronde stickers voor je lensdoppen: het brandpunt groot, met de T-stop en de lensnaam, in dezelfde kleuren als de stroken van die map. Stel de afronding in (0 = vierkant, 100 = rond), de grootte (20 tot 100 mm), de ruimte ertussen en 1 of 2 stickers per lens (voor- en achterdop). De app kijkt zelf of ze naast de stroken op het laatste vel passen; wat niet past, komt op een eigen vel. Met ruimte ertussen loopt de kleur 1 mm door voorbij de snijlijn, zodat een kleine afwijking bij het snijden niet opvalt; helemaal ronde stickers gaan het snelst met een cirkelpons van dezelfde maat.
+## Hoeken en rand
 
-## Mal voor de Tilta ARRI-ring
+Heb je niets om rondingen te snijden, kies dan bij Hoeken **recht**. Ook de uitsparing voor de nudge wordt dan recht. Met **Rand** zet je een dunne snijlijn of een zwarte rand om het label, de lensdoppen en de lenslijst; handig bij een wit label.
 
-`mal/Pullmark_mal_Tilta-ARRI-ring.stl`: 3D-printbare mal om het label recht op de Tilta ARRI-ring te zetten. De nok past in de uitsparing van 4 × 3,3 mm. Print hem plat, zonder support, in PLA of PETG. Leg het label met de lijmkant boven in de goot en de uitsparing over de nok.
+## Zonder internet
+
+Open de app één keer met internet. Daarna werkt hij ook zonder, bijvoorbeeld op de set. In Chrome kun je hem via de adresbalk installeren als app.
+
+## Zelf bouwen
+
+De app is één bestand, `index.html`, gebouwd uit de bronnen in `src/`:
+
+```
+python3 tools/build.py
+```
+
+Dat schrijft `index.html` en zet een nieuwe versie in `sw.js`. De lettertypen voor op het label (`src/labelfonts.js`) maak je met `tools/make_fonts.py`.
 
 ## Bestanden
 
 - `index.html`: de complete app (één bestand)
+- `src/`, `tools/`: de bronnen en het bouwscript
 - `manifest.webmanifest`, `sw.js`, `icons/`: maken er een installeerbare app van die offline werkt
-- `mal/`: de mal (STL) en een voorbeeldafbeelding
-- Lettertypen: Barlow en Barlow Condensed (SIL Open Font License, zie `LICENSE-fonts.txt`)
+- `meetlabel-wcu4-ring.pdf`: het meetlabel voor de WCU-4-ring
+- `mal/`: de mal (STL) voor de Tilta ARRI-ring uit de vorige versie
+- Lettertypen: zie `LICENSE-fonts.txt` en `LICENSE-fonts-apache.txt`
+
+De vorige versie van de app (versie 46) staat in de geschiedenis van deze repository.

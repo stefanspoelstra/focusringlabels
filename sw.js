@@ -1,11 +1,11 @@
-// Focusringlabels: service worker. Bewaart de app op je Mac zodat hij ook zonder internet werkt.
-// Bij een nieuwe versie wacht hij tot je in de app op "Nu bijwerken" klikt.
-const VERSION = 'b023a5eabe';
+// Pullmark: service worker. Bewaart de app in de browser, zodat hij ook zonder internet werkt (bijvoorbeeld op de set).
+// Bij een nieuwe versie haalt hij alles opnieuw op en neemt hij het direct over; de open app herlaadt dan één keer.
+const VERSION = '83a2e3d740';
 const CACHE = 'frl-' + VERSION;
-const ASSETS = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.svg", "mal/Pullmark_mal_Tilta-ARRI-ring.stl"];
+const ASSETS = ["./", "index.html", "manifest.webmanifest", "meetlabel-wcu4-ring.pdf", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png", "icons/apple-touch-icon.png", "icons/favicon.svg"];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((a) => new Request(a, { cache: 'reload' })))));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((a) => new Request(a, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -23,7 +23,9 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (req.mode === 'navigate') {
+  // de app zelf: altijd uit de bewaarde versie, ook zonder internet
+  const scope = new URL(self.registration.scope).pathname;
+  if (req.mode === 'navigate' && (url.pathname === scope || url.pathname === scope + 'index.html')) {
     e.respondWith(caches.match('index.html').then((r) => r || fetch(req)));
     return;
   }
