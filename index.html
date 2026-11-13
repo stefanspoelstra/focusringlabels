@@ -1446,8 +1446,29 @@ var Engine = (function () {
       var cut = items.map(function (it) { return { clip: it.clip, items: [{ fill: '#ffffff', contours: [it.clip] }].concat(it.items) }; });
       // maatstrook onder de labels: 0 tot 10 cm, om na het printen en snijden de schaal na te meten.
       // Hij wordt als los stukje uitgesneden. Past hij niet meer binnen maxH, dan blijft hij weg.
-      var ruler = false, RH = 8, RGAP = 4;
-      if (opts.ruler && (y1 - y0) + RGAP + RH <= maxH + 0.01) {
+      var ruler = false, RH = 8, RGAP = 4, pageW = opts.pageW || 183;
+      function dsNote(bw, bh) {
+        // het formaat van deze afbeelding, in cm zoals Design Space het vraagt: dat zijn de getallen die je bij Formaat invult
+        return say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM') + '   ·   ' + say('IN DESIGN SPACE: B ', 'IN DESIGN SPACE: W ') + fmt(bw / 10, 2) + ' × H ' + fmt(bh / 10, 2) + ' CM';
+      }
+      if (opts.ruler && (y1 - y0) >= 115 && (x1 - x0) + RGAP + RH <= pageW + 0.01) {
+        // hoge afbeelding (de stroken): maatstrook rechtop ernaast, zodat de afbeelding niet hoger wordt dan de stroken zelf.
+        // Het snijvlak is hoog al krap; in de breedte is ruimte genoeg.
+        var rx = x1 + RGAP, sv = [], clipV = polyCmds([[rx, y0], [rx + RH, y0], [rx + RH, y0 + 110], [rx, y0 + 110]]);
+        for (var tv = 0; tv <= 100; tv++) {
+          var hv = tv % 10 === 0 ? 3.0 : tv % 5 === 0 ? 2.0 : 1.2, ty = y0 + 5 + tv;
+          sv.push(polyCmds([[rx, ty - 0.06], [rx + hv, ty - 0.06], [rx + hv, ty + 0.06], [rx, ty + 0.06]]));
+          if (tv % 10 === 0) (function (ty, lab) {
+            sv.push(textContours(lab, 400, 1.6, 0.05, function (fx, fy) { return [rx + 3.5 + fx, ty + 0.8 - fy]; }));
+          })(ty, String(tv / 10));
+        }
+        var bwV = rx + RH - x0, bhV = Math.max(y1 - y0, 110);
+        // tekst van boven naar onder, met de bovenkant van de letters naar buiten
+        sv.push(textContours(dsNote(bwV, bhV), 700, 1.3, 0.06, function (fx, fy) { return [rx + 6.3 + fy, y0 + 5 + fx]; }));
+        cut.push({ clip: clipV, items: [{ fill: '#ffffff', contours: [clipV] }, { fill: '#111111', contours: sv }] });
+        x1 = rx + RH; y1 = Math.max(y1, y0 + 110); ruler = true;
+      } else if (opts.ruler && (y1 - y0) + RGAP + RH <= maxH + 0.01) {
+        // lage afbeelding (lensdoppen, lenslijst): maatstrook eronder
         var ry = y1 + RGAP, sh = [], clip = polyCmds([[x0, ry], [x0 + 110, ry], [x0 + 110, ry + RH], [x0, ry + RH]]);
         for (var t = 0; t <= 100; t++) {
           var hgt = t % 10 === 0 ? 3.0 : t % 5 === 0 ? 2.0 : 1.2, tx = x0 + 5 + t;
@@ -1457,11 +1478,7 @@ var Engine = (function () {
             sh.push(textContours(lab, 400, 1.6, 0.05, function (fx, fy) { return [tx - off + fx, ry + 5.6 - fy]; }));
           })(tx, String(t / 10));
         }
-        // het formaat van deze afbeelding staat erbij: dat zijn de getallen die je in het snijprogramma invult
-        var bw = Math.max(x1 - x0, 110), bh = ry + RH - y0;
-        // in cm, zoals Design Space het vraagt
-        var note = say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM') + '   ·   ' + say('IN DESIGN SPACE: B ', 'IN DESIGN SPACE: W ') + fmt(bw / 10, 2) + ' × H ' + fmt(bh / 10, 2) + ' CM';
-        sh.push(textContours(note, 700, 1.3, 0.06, function (fx, fy) { return [x0 + 5 + fx, ry + 7.5 - fy]; }));
+        sh.push(textContours(dsNote(Math.max(x1 - x0, 110), ry + RH - y0), 700, 1.3, 0.06, function (fx, fy) { return [x0 + 5 + fx, ry + 7.5 - fy]; }));
         cut.push({ clip: clip, items: [{ fill: '#ffffff', contours: [clip] }, { fill: '#111111', contours: sh }] });
         x1 = Math.max(x1, x0 + 110); y1 = ry + RH; ruler = true;
       }
@@ -1909,7 +1926,7 @@ Engine.addFont("saira-stencil","Saira Stencil One",{"400":{"upm":1000,"cap":877,
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.7 · 12-11-2026';
+  var VERSION = '2.8 · 13-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -2597,7 +2614,7 @@ Engine.addFont("saira-stencil","Saira Stencil One",{"400":{"upm":1000,"cap":877,
         var inch = function (v) { var t = (v / 25.4).toFixed(3); return LANG === 'en' ? t : t.replace('.', ','); };
         row.appendChild(el('strong', 'dims', T('B ', 'W ') + cm(sh.box[2]) + '   H ' + cm(sh.box[3]) + ' cm'));
         row.appendChild(el('span', '', T('in inch: B ', 'in inches: W ') + inch(sh.box[2]) + ' × H ' + inch(sh.box[3])));
-        if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer onder. Meet een strook na.', 'The ruler strip does not fit below this one. Measure a strip instead.')));
+        if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer bij. Meet een strook na.', 'The ruler strip does not fit with this one. Measure a strip instead.')));
         if (sh.box[2] > PTC.w + 0.05 || sh.box[3] > PTC.h + 0.05) row.appendChild(el('span', 'w', T('Te groot voor Print Then Cut op A4 (18,3 × 27,0 cm).', 'Too large for Print Then Cut on A4 (18.3 × 27.0 cm).')));
         ul.appendChild(row);
       });
@@ -2605,10 +2622,12 @@ Engine.addFont("saira-stencil","Saira Stencil One",{"400":{"upm":1000,"cap":877,
       var bc = el('button', 'btn small primary', T('Afbeelding voor Cricut downloaden', 'Download image for Cricut')); bc.type = 'button'; bc.onclick = cutExport;
       gc.appendChild(bc);
       var ol2 = el('ol', 'steps');
-      [T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
+      [T('Controleer eerst twee instellingen in Design Space. Bovenaan het werkblad moet de Cricut Joy Xtra als machine gekozen zijn. En bij Instellingen → Print Then Cut moet het formaat A4 zijn, niet Letter: op Letter is het snijvlak maar 25,25 cm hoog, en de stroken zijn 25,4 cm. Dan zegt Design Space altijd dat hij te groot is.',
+          'First check two settings in Design Space. At the top of the canvas the Cricut Joy Xtra must be selected as the machine. And under Settings → Print Then Cut the size must be A4, not Letter: on Letter the cutting area is only 25.25 cm tall and the strips are 25.4 cm. Design Space will then always say it is too large.'),
+        T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
         T('Zet de afbeelding op het werkblad. Hij komt meestal veel te groot binnen; dat is normaal. Laat het slotje dicht en vul bij Formaat de H in die hierboven staat, in cm (bijvoorbeeld 26,60). De B moet dan vanzelf de B van hierboven worden. Deze maten staan ook in de bestandsnaam en op de maatstrook in de afbeelding.',
           'Place the image on the canvas. It usually comes in far too large; that is normal. Keep the lock closed and enter the H shown above under Size, in cm (for example 26.60). The W should then match the W shown above. These sizes are also in the file name and on the ruler strip in the image.'),
-        T('Meldt Design Space dat de afbeelding te groot is? Kies dan nooit "Automatisch aanpassen" (Auto-Resize): dat verkleint je labels en dan klopt de schaal niet meer. Kies hierboven minder stroken per afbeelding en exporteer opnieuw.', 'Does Design Space say the image is too large? Never choose "Auto-Resize": that shrinks your labels and the scale will be wrong. Pick fewer strips per image above and export again.'),
+        T('Zolang de afbeelding nog op de ingelezen maat staat, zegt Design Space dat hij te groot is; dat verdwijnt als je de H hebt ingevuld. Meldt hij het daarna nog steeds? Kies dan nooit "Automatisch aanpassen" (Auto-Resize): dat verkleint je labels en dan klopt de schaal niet meer. Kies hierboven minder stroken per afbeelding en exporteer opnieuw.', 'As long as the image is still at the size it came in at, Design Space says it is too large; that goes away once you enter the H. Does it still say so after that? Never choose "Auto-Resize": that shrinks your labels and the scale will be wrong. Pick fewer strips per image above and export again.'),
         T('Kies Maken en print vanuit Design Space op A4. Zet de systeemdialoog aan en print op 100%, niet passend gemaakt. Laat "afloop" (bleed) aan staan.', 'Choose Make and print from Design Space on A4. Turn on the system dialog and print at 100%, not scaled to fit. Leave "bleed" on.'),
         T('Leg het vel op de snijmat en laat de Cricut snijden.', 'Put the sheet on the cutting mat and let the Cricut cut.'),
         (sheets.length && sheets[0].ruler

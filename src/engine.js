@@ -1269,8 +1269,29 @@ var Engine = (function () {
       var cut = items.map(function (it) { return { clip: it.clip, items: [{ fill: '#ffffff', contours: [it.clip] }].concat(it.items) }; });
       // maatstrook onder de labels: 0 tot 10 cm, om na het printen en snijden de schaal na te meten.
       // Hij wordt als los stukje uitgesneden. Past hij niet meer binnen maxH, dan blijft hij weg.
-      var ruler = false, RH = 8, RGAP = 4;
-      if (opts.ruler && (y1 - y0) + RGAP + RH <= maxH + 0.01) {
+      var ruler = false, RH = 8, RGAP = 4, pageW = opts.pageW || 183;
+      function dsNote(bw, bh) {
+        // het formaat van deze afbeelding, in cm zoals Design Space het vraagt: dat zijn de getallen die je bij Formaat invult
+        return say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM') + '   ·   ' + say('IN DESIGN SPACE: B ', 'IN DESIGN SPACE: W ') + fmt(bw / 10, 2) + ' × H ' + fmt(bh / 10, 2) + ' CM';
+      }
+      if (opts.ruler && (y1 - y0) >= 115 && (x1 - x0) + RGAP + RH <= pageW + 0.01) {
+        // hoge afbeelding (de stroken): maatstrook rechtop ernaast, zodat de afbeelding niet hoger wordt dan de stroken zelf.
+        // Het snijvlak is hoog al krap; in de breedte is ruimte genoeg.
+        var rx = x1 + RGAP, sv = [], clipV = polyCmds([[rx, y0], [rx + RH, y0], [rx + RH, y0 + 110], [rx, y0 + 110]]);
+        for (var tv = 0; tv <= 100; tv++) {
+          var hv = tv % 10 === 0 ? 3.0 : tv % 5 === 0 ? 2.0 : 1.2, ty = y0 + 5 + tv;
+          sv.push(polyCmds([[rx, ty - 0.06], [rx + hv, ty - 0.06], [rx + hv, ty + 0.06], [rx, ty + 0.06]]));
+          if (tv % 10 === 0) (function (ty, lab) {
+            sv.push(textContours(lab, 400, 1.6, 0.05, function (fx, fy) { return [rx + 3.5 + fx, ty + 0.8 - fy]; }));
+          })(ty, String(tv / 10));
+        }
+        var bwV = rx + RH - x0, bhV = Math.max(y1 - y0, 110);
+        // tekst van boven naar onder, met de bovenkant van de letters naar buiten
+        sv.push(textContours(dsNote(bwV, bhV), 700, 1.3, 0.06, function (fx, fy) { return [rx + 6.3 + fy, y0 + 5 + fx]; }));
+        cut.push({ clip: clipV, items: [{ fill: '#ffffff', contours: [clipV] }, { fill: '#111111', contours: sv }] });
+        x1 = rx + RH; y1 = Math.max(y1, y0 + 110); ruler = true;
+      } else if (opts.ruler && (y1 - y0) + RGAP + RH <= maxH + 0.01) {
+        // lage afbeelding (lensdoppen, lenslijst): maatstrook eronder
         var ry = y1 + RGAP, sh = [], clip = polyCmds([[x0, ry], [x0 + 110, ry], [x0 + 110, ry + RH], [x0, ry + RH]]);
         for (var t = 0; t <= 100; t++) {
           var hgt = t % 10 === 0 ? 3.0 : t % 5 === 0 ? 2.0 : 1.2, tx = x0 + 5 + t;
@@ -1280,11 +1301,7 @@ var Engine = (function () {
             sh.push(textContours(lab, 400, 1.6, 0.05, function (fx, fy) { return [tx - off + fx, ry + 5.6 - fy]; }));
           })(tx, String(t / 10));
         }
-        // het formaat van deze afbeelding staat erbij: dat zijn de getallen die je in het snijprogramma invult
-        var bw = Math.max(x1 - x0, 110), bh = ry + RH - y0;
-        // in cm, zoals Design Space het vraagt
-        var note = say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM') + '   ·   ' + say('IN DESIGN SPACE: B ', 'IN DESIGN SPACE: W ') + fmt(bw / 10, 2) + ' × H ' + fmt(bh / 10, 2) + ' CM';
-        sh.push(textContours(note, 700, 1.3, 0.06, function (fx, fy) { return [x0 + 5 + fx, ry + 7.5 - fy]; }));
+        sh.push(textContours(dsNote(Math.max(x1 - x0, 110), ry + RH - y0), 700, 1.3, 0.06, function (fx, fy) { return [x0 + 5 + fx, ry + 7.5 - fy]; }));
         cut.push({ clip: clip, items: [{ fill: '#ffffff', contours: [clip] }, { fill: '#111111', contours: sh }] });
         x1 = Math.max(x1, x0 + 110); y1 = ry + RH; ruler = true;
       }

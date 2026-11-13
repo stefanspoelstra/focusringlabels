@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.7 · 12-11-2026';
+  var VERSION = '2.8 · 13-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -690,7 +690,7 @@
         var inch = function (v) { var t = (v / 25.4).toFixed(3); return LANG === 'en' ? t : t.replace('.', ','); };
         row.appendChild(el('strong', 'dims', T('B ', 'W ') + cm(sh.box[2]) + '   H ' + cm(sh.box[3]) + ' cm'));
         row.appendChild(el('span', '', T('in inch: B ', 'in inches: W ') + inch(sh.box[2]) + ' × H ' + inch(sh.box[3])));
-        if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer onder. Meet een strook na.', 'The ruler strip does not fit below this one. Measure a strip instead.')));
+        if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer bij. Meet een strook na.', 'The ruler strip does not fit with this one. Measure a strip instead.')));
         if (sh.box[2] > PTC.w + 0.05 || sh.box[3] > PTC.h + 0.05) row.appendChild(el('span', 'w', T('Te groot voor Print Then Cut op A4 (18,3 × 27,0 cm).', 'Too large for Print Then Cut on A4 (18.3 × 27.0 cm).')));
         ul.appendChild(row);
       });
@@ -698,10 +698,12 @@
       var bc = el('button', 'btn small primary', T('Afbeelding voor Cricut downloaden', 'Download image for Cricut')); bc.type = 'button'; bc.onclick = cutExport;
       gc.appendChild(bc);
       var ol2 = el('ol', 'steps');
-      [T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
+      [T('Controleer eerst twee instellingen in Design Space. Bovenaan het werkblad moet de Cricut Joy Xtra als machine gekozen zijn. En bij Instellingen → Print Then Cut moet het formaat A4 zijn, niet Letter: op Letter is het snijvlak maar 25,25 cm hoog, en de stroken zijn 25,4 cm. Dan zegt Design Space altijd dat hij te groot is.',
+          'First check two settings in Design Space. At the top of the canvas the Cricut Joy Xtra must be selected as the machine. And under Settings → Print Then Cut the size must be A4, not Letter: on Letter the cutting area is only 25.25 cm tall and the strips are 25.4 cm. Design Space will then always say it is too large.'),
+        T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
         T('Zet de afbeelding op het werkblad. Hij komt meestal veel te groot binnen; dat is normaal. Laat het slotje dicht en vul bij Formaat de H in die hierboven staat, in cm (bijvoorbeeld 26,60). De B moet dan vanzelf de B van hierboven worden. Deze maten staan ook in de bestandsnaam en op de maatstrook in de afbeelding.',
           'Place the image on the canvas. It usually comes in far too large; that is normal. Keep the lock closed and enter the H shown above under Size, in cm (for example 26.60). The W should then match the W shown above. These sizes are also in the file name and on the ruler strip in the image.'),
-        T('Meldt Design Space dat de afbeelding te groot is? Kies dan nooit "Automatisch aanpassen" (Auto-Resize): dat verkleint je labels en dan klopt de schaal niet meer. Kies hierboven minder stroken per afbeelding en exporteer opnieuw.', 'Does Design Space say the image is too large? Never choose "Auto-Resize": that shrinks your labels and the scale will be wrong. Pick fewer strips per image above and export again.'),
+        T('Zolang de afbeelding nog op de ingelezen maat staat, zegt Design Space dat hij te groot is; dat verdwijnt als je de H hebt ingevuld. Meldt hij het daarna nog steeds? Kies dan nooit "Automatisch aanpassen" (Auto-Resize): dat verkleint je labels en dan klopt de schaal niet meer. Kies hierboven minder stroken per afbeelding en exporteer opnieuw.', 'As long as the image is still at the size it came in at, Design Space says it is too large; that goes away once you enter the H. Does it still say so after that? Never choose "Auto-Resize": that shrinks your labels and the scale will be wrong. Pick fewer strips per image above and export again.'),
         T('Kies Maken en print vanuit Design Space op A4. Zet de systeemdialoog aan en print op 100%, niet passend gemaakt. Laat "afloop" (bleed) aan staan.', 'Choose Make and print from Design Space on A4. Turn on the system dialog and print at 100%, not scaled to fit. Leave "bleed" on.'),
         T('Leg het vel op de snijmat en laat de Cricut snijden.', 'Put the sheet on the cutting mat and let the Cricut cut.'),
         (sheets.length && sheets[0].ruler
