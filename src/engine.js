@@ -1257,9 +1257,12 @@ var Engine = (function () {
     opts = opts || {};
     var j = {}, out = [], k; for (k in job) j[k] = job[k];
     j.noBleed = true;
-    var maxW = opts.maxW || 125, maxH = opts.maxH || 269.8;
-    var ring = ringFor(j.ring), pitch = ring.W >= 19 ? PAGE.pitch : Math.max(ring.W + 7, 12);
-    var per = Math.max(1, Math.floor((maxW - ring.W + 0.05) / pitch) + 1);
+    var maxW = opts.maxW || 120, maxH = opts.maxH || 269.8;
+    // Het snijvlak is een trapvorm: hoe hoger de afbeelding, hoe smaller hij moet zijn. area = [[breedte, hoogte], ...] in mm.
+    var area = opts.area || [[maxW, maxH]];
+    function fits(w, h) { return area.some(function (t) { return w <= t[0] + 0.01 && h <= t[1] + 0.01; }); }
+    var ring = ringFor(j.ring), gap = opts.gap || 4, pitch = ring.W + gap;
+    var per = Math.max(1, Math.min(opts.per || 99, Math.floor((maxW - ring.W + 0.05) / pitch) + 1));
     function finish(pageItems) {
       var items = pageItems.filter(function (it) { return it.clip; });
       if (!items.length) return;
@@ -1269,12 +1272,14 @@ var Engine = (function () {
       var cut = items.map(function (it) { return { clip: it.clip, items: [{ fill: '#ffffff', contours: [it.clip] }].concat(it.items) }; });
       // maatstrook onder de labels: 0 tot 10 cm, om na het printen en snijden de schaal na te meten.
       // Hij wordt als los stukje uitgesneden. Past hij niet meer binnen maxH, dan blijft hij weg.
-      var ruler = false, RH = 8, RGAP = 4, pageW = opts.pageW || 183;
+      var ruler = false, RH = 8, RGAP = 3, bw0 = x1 - x0, bh0 = y1 - y0;
+      // maatstrook eronder als dat binnen het snijvlak past, anders ernaast, anders weg
+      var below = fits(Math.max(bw0, 110), bh0 + RGAP + RH), beside = !below && fits(bw0 + RGAP + RH, Math.max(bh0, 110));
       function dsNote(bw, bh) {
         // het formaat van deze afbeelding, in cm zoals Design Space het vraagt: dat zijn de getallen die je bij Formaat invult
         return say('0 TOT 10 = 100 MM', '0 TO 10 = 100 MM') + '   ·   ' + say('IN DESIGN SPACE: B ', 'IN DESIGN SPACE: W ') + fmt(bw / 10, 2) + ' × H ' + fmt(bh / 10, 2) + ' CM';
       }
-      if (opts.ruler && (y1 - y0) >= 115 && (x1 - x0) + RGAP + RH <= pageW + 0.01) {
+      if (opts.ruler && beside) {
         // hoge afbeelding (de stroken): maatstrook rechtop ernaast, zodat de afbeelding niet hoger wordt dan de stroken zelf.
         // Het snijvlak is hoog al krap; in de breedte is ruimte genoeg.
         var rx = x1 + RGAP, sv = [], clipV = polyCmds([[rx, y0], [rx + RH, y0], [rx + RH, y0 + 110], [rx, y0 + 110]]);
@@ -1290,7 +1295,7 @@ var Engine = (function () {
         sv.push(textContours(dsNote(bwV, bhV), 700, 1.3, 0.06, function (fx, fy) { return [rx + 6.3 + fy, y0 + 5 + fx]; }));
         cut.push({ clip: clipV, items: [{ fill: '#ffffff', contours: [clipV] }, { fill: '#111111', contours: sv }] });
         x1 = rx + RH; y1 = Math.max(y1, y0 + 110); ruler = true;
-      } else if (opts.ruler && (y1 - y0) + RGAP + RH <= maxH + 0.01) {
+      } else if (opts.ruler && below) {
         // lage afbeelding (lensdoppen, lenslijst): maatstrook eronder
         var ry = y1 + RGAP, sh = [], clip = polyCmds([[x0, ry], [x0 + 110, ry], [x0 + 110, ry + RH], [x0, ry + RH]]);
         for (var t = 0; t <= 100; t++) {
@@ -1305,12 +1310,12 @@ var Engine = (function () {
         cut.push({ clip: clip, items: [{ fill: '#ffffff', contours: [clip] }, { fill: '#111111', contours: sh }] });
         x1 = Math.max(x1, x0 + 110); y1 = ry + RH; ruler = true;
       }
-      out.push({ items: cut, ruler: ruler, box: [x0, y0, x1 - x0, y1 - y0],
+      out.push({ items: cut, ruler: ruler, box: [x0, y0, x1 - x0, y1 - y0], fits: fits(x1 - x0, y1 - y0),
         strips: items.filter(function (it) { return !it.cap && !it.list; }).length,
         caps: items.filter(function (it) { return it.cap; }).length, lists: items.filter(function (it) { return it.list; }).length });
     }
     // 1. stroken: smal en hoog
-    buildPages(j, { perPage: per }).forEach(function (p) { finish(p.items); });
+    buildPages(j, { perPage: per, pitch: pitch }).forEach(function (p) { finish(p.items); });
     // 2. lensdoppen en lenslijst: in een eigen afbeelding, ook hooguit maxW breed
     var caps = j.caps ? capConfig(j) : null, list = caps ? caps.list.slice() : [];
     var lc = j.lensList && j.lensList.on ? listConfig(j) : null, left = lc && lc.lenses.length ? lc.n : 0;
@@ -1339,7 +1344,8 @@ var Engine = (function () {
     // smalle labels: dichter op elkaar en meer per vel (standaardlabel: 7 per vel, zoals altijd)
     var pitch = ring.W >= 19 ? PAGE.pitch : Math.max(ring.W + 7, 12);
     var perPage = ring.W >= 19 ? PAGE.perPage : Math.max(1, Math.floor((210 - 2 * PAGE.firstX + (pitch - ring.W)) / pitch));
-    if (opts.perPage) perPage = Math.max(1, Math.min(perPage, Math.floor(opts.perPage)));
+    if (opts.pitch) pitch = Math.max(ring.W + 1, opts.pitch);
+    if (opts.perPage) perPage = Math.max(1, Math.min(opts.pitch ? 99 : perPage, Math.floor(opts.perPage)));
     var pages = [], n = Math.max(1, Math.ceil(lenses.length / perPage));
     var dateStr = opts.date || '';
     for (var p = 0; p < n; p++) {

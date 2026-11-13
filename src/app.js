@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.8 · 13-11-2026';
+  var VERSION = '2.9 · 13-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -285,7 +285,10 @@
   }
   // ---------- snijmachine (Cricut) ----------
   // De opdracht voor de snijmachine: randen staan binnen de snijlijn, en de dunne grijze snijlijn vervalt (de machine snijdt zelf).
-  var PTC = { w: 183, h: 269.8 };   // snijvlak van Print Then Cut op A4, in mm
+  // Snijvlak van Print Then Cut op A4 (Joy Xtra, Explore, Maker), in mm. Het is een trapvorm: hoog en smal, of lager en breder.
+  // Gemeten in Design Space (12,0 × 27,1 / 16,9 × 25,6 / 18,4 × 20,7 cm), iets krapper genomen en begrensd op de opgave van Cricut (26,98 × 18,3 cm).
+  var PTC = { w: 183, h: 269.8, area: [[118, 269.8], [166, 253], [181, 205]] };
+  function fitsPTC(w, h) { return PTC.area.some(function (t) { return w <= t[0] + 0.01 && h <= t[1] + 0.01; }); }
   function cutJob(set) {
     var j = jobFor(set), o = S.opts;
     function inside(q) { if (!q || q.on === false) return q; var r = {}; Object.keys(q).forEach(function (k) { r[k] = q[k]; }); r.pos = 'in'; return r; }
@@ -296,11 +299,11 @@
     return j;
   }
   // hoeveel stroken naast elkaar in één afbeelding: weinig, want een hoge afbeelding mag bij Print Then Cut niet ook breed zijn
-  function cutPer() { var n = Number(S.opts.cutPer); return n >= 1 && n <= 6 ? Math.floor(n) : 5; }
+  function cutPer() { var n = Number(S.opts.cutPer); return n >= 1 && n <= 5 ? Math.floor(n) : 5; }
   function cutSheets(set) {
     Engine.setLabelFont(S.opts.font || '');
-    var W = Engine.ringFor({ preset: S.ring }).W, pitch = W >= 19 ? Engine.PAGE.pitch : Math.max(W + 7, 12);
-    return Engine.buildCutSheets(cutJob(set), { ruler: S.opts.cutRuler !== false, maxH: PTC.h, maxW: (cutPer() - 1) * pitch + W + 0.1 });
+    // stroken 4 mm uit elkaar: genoeg voor de afloop (bleed) en het mes, en vijf stroken blijven smal genoeg voor het hoge deel van het snijvlak
+    return Engine.buildCutSheets(cutJob(set), { ruler: S.opts.cutRuler !== false, maxH: PTC.h, maxW: PTC.area[0][0], area: PTC.area, gap: 4, per: cutPer() });
   }
   function cm(v) { var t = (Math.round(v * 10) / 100).toFixed(2); return LANG === 'en' ? t : t.replace('.', ','); }
   // De echte maat ook in het bestand zelf zetten (PNG-blok pHYs, pixels per meter). Een programma dat dat leest, plaatst
@@ -677,10 +680,10 @@
         'A Cricut only cuts what you print from its own software (Design Space). For that, Pullmark makes an image of just the labels, with a transparent background. The Cricut cuts along the edge of each label.')));
       gc.appendChild(check(T('Maatstrook meesturen, om de schaal na te meten', 'Include a ruler strip, to check the scale'), function () { return S.opts.cutRuler !== false; }, function (v) { S.opts.cutRuler = v; }));
       var cp = el('div', 'sub flat'); cp.appendChild(document.createTextNode(T('Stroken per afbeelding', 'Strips per image')));
-      cp.appendChild(selIn([['6', '6'], ['5', '5'], ['4', '4'], ['3', '3'], ['2', '2']], function () { return String(cutPer()); }, function (v) { S.opts.cutPer = Number(v); }));
+      cp.appendChild(selIn([['5', '5'], ['4', '4'], ['3', '3'], ['2', '2']], function () { return String(cutPer()); }, function (v) { S.opts.cutPer = Number(v); }));
       gc.appendChild(cp);
-      gc.appendChild(el('p', 'hint', T('Het snijvlak van de Cricut is in de hoeken kleiner, omdat daar de markeringen staan. Een hoge afbeelding mag daarom niet te breed zijn. Zegt Design Space dat een afbeelding te groot is, kies hier dan minder stroken.',
-        'The cutting area of the Cricut is smaller in the corners, because the marks are printed there. A tall image therefore cannot be too wide. If Design Space says an image is too large, pick fewer strips here.')));
+      gc.appendChild(el('p', 'hint', T('Het snijvlak van de Cricut op A4 is een trapvorm: 27 cm hoog mag alleen als het 12 cm smal is. De stroken staan daarom dichter op elkaar dan op het gewone vel, en de app houdt elke afbeelding binnen dat snijvlak. Zegt Design Space toch dat een afbeelding te groot is, kies hier dan minder stroken.',
+        'The cutting area of the Cricut on A4 is stepped: 27 cm tall is only allowed if it is 12 cm narrow. The strips are therefore closer together than on the normal sheet, and the app keeps every image inside that area. If Design Space still says an image is too large, pick fewer strips here.')));
       var sheets = cutSheets(set), ul = el('div', 'cutlist');
       sheets.forEach(function (sh, i) {
         var what = [sh.strips ? sh.strips + (sh.strips === 1 ? T(' strook', ' strip') : T(' stroken', ' strips')) : '', sh.caps ? sh.caps + (sh.caps === 1 ? T(' lensdop', ' lens cap') : T(' lensdoppen', ' lens caps')) : '', sh.lists ? T('lenslijst', 'lens list') : ''].filter(Boolean).join(', ');
@@ -691,7 +694,7 @@
         row.appendChild(el('strong', 'dims', T('B ', 'W ') + cm(sh.box[2]) + '   H ' + cm(sh.box[3]) + ' cm'));
         row.appendChild(el('span', '', T('in inch: B ', 'in inches: W ') + inch(sh.box[2]) + ' × H ' + inch(sh.box[3])));
         if (S.opts.cutRuler !== false && !sh.ruler) row.appendChild(el('span', 'w', T('Hier past de maatstrook niet meer bij. Meet een strook na.', 'The ruler strip does not fit with this one. Measure a strip instead.')));
-        if (sh.box[2] > PTC.w + 0.05 || sh.box[3] > PTC.h + 0.05) row.appendChild(el('span', 'w', T('Te groot voor Print Then Cut op A4 (18,3 × 27,0 cm).', 'Too large for Print Then Cut on A4 (18.3 × 27.0 cm).')));
+        if (!fitsPTC(sh.box[2], sh.box[3])) row.appendChild(el('span', 'w', T('Past niet in het snijvlak van Print Then Cut op A4. Kies minder stroken per afbeelding.', 'Does not fit the Print Then Cut area on A4. Pick fewer strips per image.')));
         ul.appendChild(row);
       });
       gc.appendChild(ul);
