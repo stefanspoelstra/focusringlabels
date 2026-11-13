@@ -37,10 +37,11 @@ var Engine = (function () {
     // WCU-4-ring (ARRI-maat, 3D-geprint) op de Nucleus-M II. Nagemeten op 12-11-2026 met het meetlabel:
     // omtrek 254,5 mm; de ∞-aanslag (motorwaarde 10000) ligt op het midden van de nudge; schaal 24,5 mm per 1000
     // (lijn door acht afstanden van de Dulens 43 mm: 24,5 ± 0,1). Uitsparing in de ring 4,0 × 5,0 mm.
-    // Het label loopt bijna rond (254 mm), zodat ook de kortste afstanden (tot 245 mm) erop passen.
+    // Het label loopt bijna rond (252 mm; 254 overlapte op de ring). Afstanden voorbij 243,5 mm (alleen de allerkortste
+    // van een paar lenzen, zoals Thypoch M 50/75 en Laowa 25-100) vallen eraf; de rest past.
     'wcu4': {
       label: 'WCU-4-ring op Nucleus-M II',
-      W: 19.39, top: -8.5, length: 254, corner: 0.9,
+      W: 19.39, top: -8.5, length: 252, corner: 0.9,
       notch: { h: 2.0, depth: 5.0, fillet: 0 },
       mmPer1000: 24.5, offset: 0, radius: 0, endZone: 0, zeroRef: 'center', infMode: 'lens',
       anchorFv: 10000, anchorLabel: 'de ∞-aanslag', lockInf: true

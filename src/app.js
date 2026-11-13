@@ -2,7 +2,7 @@
 // De rekenkern (Engine) is dezelfde als in versie 1; deze laag is alleen de bediening.
 (function () {
   'use strict';
-  var VERSION = '2.9 · 13-11-2026';
+  var VERSION = '2.10 · 13-11-2026';
   var KEY = 'pullmark2';
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
@@ -701,8 +701,8 @@
       var bc = el('button', 'btn small primary', T('Afbeelding voor Cricut downloaden', 'Download image for Cricut')); bc.type = 'button'; bc.onclick = cutExport;
       gc.appendChild(bc);
       var ol2 = el('ol', 'steps');
-      [T('Controleer eerst twee instellingen in Design Space. Bovenaan het werkblad moet de Cricut Joy Xtra als machine gekozen zijn. En bij Instellingen → Print Then Cut moet het formaat A4 zijn, niet Letter: op Letter is het snijvlak maar 25,25 cm hoog, en de stroken zijn 25,4 cm. Dan zegt Design Space altijd dat hij te groot is.',
-          'First check two settings in Design Space. At the top of the canvas the Cricut Joy Xtra must be selected as the machine. And under Settings → Print Then Cut the size must be A4, not Letter: on Letter the cutting area is only 25.25 cm tall and the strips are 25.4 cm. Design Space will then always say it is too large.'),
+      [T('Controleer eerst twee instellingen in Design Space. Bovenaan het werkblad moet de Cricut Joy Xtra als machine gekozen zijn. En bij Instellingen → Print Then Cut moet het formaat A4 zijn, niet Letter: op Letter is het snijvlak maar 25,25 cm hoog, en dan passen de stroken met het meetlatje er niet op. Design Space zegt dan dat hij te groot is.',
+          'First check two settings in Design Space. At the top of the canvas the Cricut Joy Xtra must be selected as the machine. And under Settings → Print Then Cut the size must be A4, not Letter: on Letter the cutting area is only 25.25 cm tall, and the strips with the ruler do not fit. Design Space will then say it is too large.'),
         T('Open Design Space en kies Uploaden. Kies de afbeelding en bewaar hem als "Print Then Cut". De achtergrond is al doorzichtig; je hoeft niets weg te halen.', 'Open Design Space and choose Upload. Pick the image and save it as "Print Then Cut". The background is already transparent; there is nothing to remove.'),
         T('Zet de afbeelding op het werkblad. Hij komt meestal veel te groot binnen; dat is normaal. Laat het slotje dicht en vul bij Formaat de H in die hierboven staat, in cm (bijvoorbeeld 26,60). De B moet dan vanzelf de B van hierboven worden. Deze maten staan ook in de bestandsnaam en op de maatstrook in de afbeelding.',
           'Place the image on the canvas. It usually comes in far too large; that is normal. Keep the lock closed and enter the H shown above under Size, in cm (for example 26.60). The W should then match the W shown above. These sizes are also in the file name and on the ruler strip in the image.'),
